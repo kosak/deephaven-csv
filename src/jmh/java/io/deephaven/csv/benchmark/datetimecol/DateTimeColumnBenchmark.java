@@ -1,4 +1,4 @@
-package io.deephaven.csv.benchmark.intcol;
+package io.deephaven.csv.benchmark.datetimecol;
 
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
 import org.openjdk.jmh.annotations.*;
@@ -6,17 +6,18 @@ import org.openjdk.jmh.annotations.*;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 
 @Fork(jvmArgs = {"-Xms4G", "-Xmx4G"})
 @BenchmarkMode(Mode.Throughput)
 @Warmup(iterations = 2, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 5, timeUnit = TimeUnit.SECONDS)
 @State(Scope.Thread)
-public class IntColumnBenchmark {
+public class DateTimeColumnBenchmark {
     private static final int ROWS = 1_000_000;
     private static final int COLS = 5;
     private static final int OPERATIONS = ROWS * COLS;
@@ -25,15 +26,16 @@ public class IntColumnBenchmark {
     public static class InputProvider {
         private final String[] headers;
         private final byte[] inputText;
-        private final int[][] expected;
+        private final long[][] expected;
 
         public InputProvider() {
             headers = new String[COLS];
-            expected = new int[COLS][];
+            expected = new long[COLS][];
             for (int col = 0; col < COLS; ++col) {
                 headers[col] = "Col" + (col + 1);
-                expected[col] = new int[ROWS];
+                expected[col] = new long[ROWS];
             }
+
             final Random rng = new Random(31337);
             final StringBuilder sb = new StringBuilder();
             sb.append(String.join(",", headers)).append('\n');
@@ -41,9 +43,18 @@ public class IntColumnBenchmark {
             for (int row = 0; row < ROWS; ++row) {
                 String colSep = "";
                 for (int col = 0; col < COLS; ++col) {
-                    final int next = rng.nextInt();
-                    expected[col][row] = next;
-                    sb.append(colSep).append(next);
+                    final int yyyy = 2000 + rng.nextInt(1000);
+                    final int MM = 1 + rng.nextInt(12);
+                    final int dd = 1 + rng.nextInt(28);
+                    final int hh = rng.nextInt(24);
+                    final int mm = rng.nextInt(60);
+                    final int ss = rng.nextInt(60);
+                    final int nanos = rng.nextInt(1_000_000_000);
+                    final ZonedDateTime zdt = ZonedDateTime.of(yyyy, MM, dd, hh, mm, ss, nanos, ZoneOffset.UTC);
+                    final long zdtSeconds = zdt.toEpochSecond();
+                    final int zdtNanos = zdt.getNano();
+                    expected[col][row] = zdtSeconds * 1_000_000_000 + zdtNanos;
+                    sb.append(colSep).append(zdt);
                     colSep = ",";
                 }
                 sb.append('\n');
@@ -55,7 +66,7 @@ public class IntColumnBenchmark {
             return headers;
         }
 
-        public int[][] expected() {
+        public long[][] expected() {
             return expected;
         }
 
@@ -72,25 +83,25 @@ public class IntColumnBenchmark {
     @State(Scope.Thread)
     public static class ReusableStorage {
         // We happen to know size of the output. But if not, we could have used a growable collection type instead.
-        private final int[][] output;
+        private final long[][] output;
 
         public ReusableStorage() {
-            output = new int[COLS][];
+            output = new long[COLS][];
             for (int col = 0; col < COLS; ++col) {
-                output[col] = new int[ROWS];
+                output[col] = new long[ROWS];
             }
         }
 
-        public int[][] output() {
+        public long[][] output() {
             return output;
         }
     }
 
-    BenchmarkResult<int[]> result;
+    BenchmarkResult<long[]> result;
 
     @TearDown(Level.Invocation)
     public void check(final InputProvider input) {
-        if (!Arrays.deepEquals(input.expected(), result.columns())) {
+        if (!Arrays.deepEquals(input.expected, result.columns())) {
             throw new RuntimeException("Expected != actual");
         }
     }
@@ -98,43 +109,43 @@ public class IntColumnBenchmark {
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void deephaven(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserDeephaven.read(input.makeStream(), storage.output());
+        result = DateTimeColumnParserDeephaven.read(input.makeStream(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void apache(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserApache.read(input.makeStream(), storage.output());
+        result = DateTimeColumnParserApache.read(input.makeStream(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void fastCsv(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserFastCsv.read(input.makeStream(), storage.output());
+        result = DateTimeColumnParserFastCsv.read(input.makeStream(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void jackson(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserJacksonCsv.read(input.makeStream(), input.headers(), storage.output());
+        result = DateTimeColumnParserJacksonCsv.read(input.makeStream(), input.headers(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void openCsv(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserOpenCsv.read(input.makeStream(), storage.output());
+        result = DateTimeColumnParserOpenCsv.read(input.makeStream(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void simpleFlatMapper(final InputProvider input, final ReusableStorage storage)
             throws Exception {
-        result = IntColumnParserSimpleFlatMapper.read(input.makeStream(), storage.output());
+        result = DateTimeColumnParserSimpleFlatMapper.read(input.makeStream(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void superCsv(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserSuperCsv.read(input.makeStream(), storage.output());
+        result = DateTimeColumnParserSuperCsv.read(input.makeStream(), storage.output());
     }
 }

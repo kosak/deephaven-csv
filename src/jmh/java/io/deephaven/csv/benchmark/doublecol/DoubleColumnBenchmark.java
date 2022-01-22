@@ -1,5 +1,6 @@
-package io.deephaven.csv.benchmark.intcol;
+package io.deephaven.csv.benchmark.doublecol;
 
+import ch.randelshofer.fastdoubleparser.FastDoubleParser;
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
 import org.openjdk.jmh.annotations.*;
 
@@ -9,14 +10,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 
 @Fork(jvmArgs = {"-Xms4G", "-Xmx4G"})
 @BenchmarkMode(Mode.Throughput)
 @Warmup(iterations = 2, time = 2, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 5, timeUnit = TimeUnit.SECONDS)
 @State(Scope.Thread)
-public class IntColumnBenchmark {
+public class DoubleColumnBenchmark {
     private static final int ROWS = 1_000_000;
     private static final int COLS = 5;
     private static final int OPERATIONS = ROWS * COLS;
@@ -25,25 +25,25 @@ public class IntColumnBenchmark {
     public static class InputProvider {
         private final String[] headers;
         private final byte[] inputText;
-        private final int[][] expected;
+        private final double[][] expected;
 
         public InputProvider() {
             headers = new String[COLS];
-            expected = new int[COLS][];
+            expected = new double[COLS][];
             for (int col = 0; col < COLS; ++col) {
                 headers[col] = "Col" + (col + 1);
-                expected[col] = new int[ROWS];
+                expected[col] = new double[ROWS];
             }
-            final Random rng = new Random(31337);
+            final Random random = new Random(31337);
             final StringBuilder sb = new StringBuilder();
             sb.append(String.join(",", headers)).append('\n');
-
             for (int row = 0; row < ROWS; ++row) {
                 String colSep = "";
                 for (int col = 0; col < COLS; ++col) {
-                    final int next = rng.nextInt();
+                    final double next = random.nextDouble();
                     expected[col][row] = next;
-                    sb.append(colSep).append(next);
+                    sb.append(colSep);
+                    sb.append(next);
                     colSep = ",";
                 }
                 sb.append('\n');
@@ -55,7 +55,7 @@ public class IntColumnBenchmark {
             return headers;
         }
 
-        public int[][] expected() {
+        public double[][] expected() {
             return expected;
         }
 
@@ -72,25 +72,25 @@ public class IntColumnBenchmark {
     @State(Scope.Thread)
     public static class ReusableStorage {
         // We happen to know size of the output. But if not, we could have used a growable collection type instead.
-        private final int[][] output;
+        private final double[][] output;
 
         public ReusableStorage() {
-            output = new int[COLS][];
+            output = new double[COLS][];
             for (int col = 0; col < COLS; ++col) {
-                output[col] = new int[ROWS];
+                output[col] = new double[ROWS];
             }
         }
 
-        public int[][] output() {
+        public double[][] output() {
             return output;
         }
     }
 
-    BenchmarkResult<int[]> result;
+    BenchmarkResult<double[]> result;
 
     @TearDown(Level.Invocation)
     public void check(final InputProvider input) {
-        if (!Arrays.deepEquals(input.expected(), result.columns())) {
+        if (!Arrays.deepEquals(input.expected, result.columns())) {
             throw new RuntimeException("Expected != actual");
         }
     }
@@ -98,43 +98,75 @@ public class IntColumnBenchmark {
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void deephaven(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserDeephaven.read(input.makeStream(), storage.output());
+        result = DoubleColumnParserDeephaven.read(input.makeStream(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void apache(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserApache.read(input.makeStream(), storage.output());
+        result = DoubleColumnParserApache.read(input.makeStream(), storage.output(), Double::parseDouble);
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(OPERATIONS)
+    public void apacheFastDoubleParser(final InputProvider input, final ReusableStorage storage) throws Exception {
+        result = DoubleColumnParserApache.read(input.makeStream(), storage.output(), FastDoubleParser::parseDouble);
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void fastCsv(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserFastCsv.read(input.makeStream(), storage.output());
+        result = DoubleColumnParserFastCsv.read(input.makeStream(), storage.output(), Double::parseDouble);
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(OPERATIONS)
+    public void fastCsvFastDoubleParser(final InputProvider input, final ReusableStorage storage) throws Exception {
+        result = DoubleColumnParserFastCsv.read(input.makeStream(), storage.output(), FastDoubleParser::parseDouble);
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void jackson(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserJacksonCsv.read(input.makeStream(), input.headers(), storage.output());
+        result = DoubleColumnParserJacksonCsv.read(input.makeStream(), input.headers(), storage.output());
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void openCsv(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserOpenCsv.read(input.makeStream(), storage.output());
+        result = DoubleColumnParserOpenCsv.read(input.makeStream(), storage.output(), Double::parseDouble);
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(OPERATIONS)
+    public void openCsvFastDoubleParser(final InputProvider input, final ReusableStorage storage) throws Exception {
+        result = DoubleColumnParserOpenCsv.read(input.makeStream(), storage.output(), FastDoubleParser::parseDouble);
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void simpleFlatMapper(final InputProvider input, final ReusableStorage storage)
             throws Exception {
-        result = IntColumnParserSimpleFlatMapper.read(input.makeStream(), storage.output());
+        result = DoubleColumnParserSimpleFlatMapper.read(input.makeStream(), storage.output(), Double::parseDouble);
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(OPERATIONS)
+    public void simpleFlatMapperFastDoubleParser(final InputProvider input, final ReusableStorage storage)
+            throws Exception {
+        result = DoubleColumnParserSimpleFlatMapper.read(input.makeStream(), storage.output(),
+                FastDoubleParser::parseDouble);
     }
 
     @Benchmark
     @OperationsPerInvocation(OPERATIONS)
     public void superCsv(final InputProvider input, final ReusableStorage storage) throws Exception {
-        result = IntColumnParserSuperCsv.read(input.makeStream(), storage.output());
+        result = DoubleColumnParserSuperCsv.read(input.makeStream(), storage.output(), Double::parseDouble);
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(OPERATIONS)
+    public void superCsvFastDoubleParser(final InputProvider input, final ReusableStorage storage) throws Exception {
+        result = DoubleColumnParserSuperCsv.read(input.makeStream(), storage.output(), FastDoubleParser::parseDouble);
     }
 }

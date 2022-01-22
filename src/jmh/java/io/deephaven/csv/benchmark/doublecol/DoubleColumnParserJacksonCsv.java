@@ -1,30 +1,29 @@
-package io.deephaven.csv.benchmark.intcol;
+package io.deephaven.csv.benchmark.doublecol;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import io.deephaven.csv.benchmark.doublecol.DoubleColumnParserJacksonCsv;
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
 
 import java.io.InputStream;
+import java.util.List;
 
-public final class IntColumnParserJacksonCsv {
-    // Special case: assume 5 columns.
+public final class DoubleColumnParserJacksonCsv {
     public static class Row {
         @JsonProperty
-        public int Col1;
+        public double Col1;
         @JsonProperty
-        public int Col2;
+        public double Col2;
         @JsonProperty
-        public int Col3;
+        public double Col3;
         @JsonProperty
-        public int Col4;
+        public double Col4;
         @JsonProperty
-        public int Col5;
+        public double Col5;
     }
 
-    public static BenchmarkResult<int[]> read(final InputStream in, final String[] headers, final int[][] storage)
+    public static BenchmarkResult<double[]> read(final InputStream in, final String[] headers, final double[][] storage)
             throws Exception {
         if (headers.length != 5) {
             throw new RuntimeException("JacksonCsv benchmark has been special-cased to assume 5 columns");
