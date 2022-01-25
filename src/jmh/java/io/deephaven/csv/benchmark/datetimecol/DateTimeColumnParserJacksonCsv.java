@@ -4,36 +4,27 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import io.deephaven.csv.benchmark.doublecol.DoubleColumnParserJacksonCsv;
-import io.deephaven.csv.benchmark.intcol.IntColumnParserJacksonCsv;
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
-import io.deephaven.csv.benchmark.util.DateTimeParser;
+import io.deephaven.csv.benchmark.util.DateTimeToLongParser;
 
 import java.io.InputStream;
 
 public final class DateTimeColumnParserJacksonCsv {
     public static class Row {
-        public Row(
-                @JsonProperty("Col1") String col1Text,
-                @JsonProperty("Col2") String col2Text,
-                @JsonProperty("Col3") String col3Text,
-                @JsonProperty("Col4") String col4Text,
-                @JsonProperty("Col5") String col5Text) {
-            col1AsLong = DateTimeParser.parseDateTime(col1Text);
-            col2AsLong = DateTimeParser.parseDateTime(col2Text);
-            col3AsLong = DateTimeParser.parseDateTime(col3Text);
-            col4AsLong = DateTimeParser.parseDateTime(col4Text);
-            col5AsLong = DateTimeParser.parseDateTime(col5Text);
-        }
-
-        public final long col1AsLong;
-        public final long col2AsLong;
-        public final long col3AsLong;
-        public final long col4AsLong;
-        public final long col5AsLong;
+        @JsonProperty
+        public String Col1;
+        @JsonProperty
+        public String Col2;
+        @JsonProperty
+        public String Col3;
+        @JsonProperty
+        public String Col4;
+        @JsonProperty
+        public String Col5;
     }
 
-    public static BenchmarkResult<long[]> read(final InputStream in, final String[] headers, final long[][] storage) throws Exception {
+    public static BenchmarkResult<long[]> read(final InputStream in, final String[] headers, final long[][] storage,
+            DateTimeToLongParser dateTimeToLongParser) throws Exception {
         if (headers.length != 5) {
             throw new RuntimeException("JacksonCsv benchmark has been special-cased to assume 5 columns");
         }
@@ -49,11 +40,11 @@ public final class DateTimeColumnParserJacksonCsv {
         int rowNum = 0;
         while (it.hasNext()) {
             final Row row = it.next();
-            storage[0][rowNum] = row.col1AsLong;
-            storage[1][rowNum] = row.col2AsLong;
-            storage[2][rowNum] = row.col3AsLong;
-            storage[3][rowNum] = row.col4AsLong;
-            storage[4][rowNum] = row.col5AsLong;
+            storage[0][rowNum] = dateTimeToLongParser.parse(row.Col1);
+            storage[1][rowNum] = dateTimeToLongParser.parse(row.Col2);
+            storage[2][rowNum] = dateTimeToLongParser.parse(row.Col3);
+            storage[3][rowNum] = dateTimeToLongParser.parse(row.Col4);
+            storage[4][rowNum] = dateTimeToLongParser.parse(row.Col5);
             ++rowNum;
         }
         return BenchmarkResult.of(rowNum, storage);

@@ -2,6 +2,7 @@ package io.deephaven.csv.benchmark.doublecol;
 
 import com.opencsv.CSVReader;
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
+import io.deephaven.csv.benchmark.util.Util;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;

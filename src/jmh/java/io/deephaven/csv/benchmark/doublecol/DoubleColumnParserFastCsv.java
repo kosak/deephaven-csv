@@ -13,6 +13,7 @@ import java.util.function.ToDoubleFunction;
 public final class DoubleColumnParserFastCsv {
     public static BenchmarkResult<double[]> read(final InputStream in, final double[][] storage,
             ToDoubleFunction<String> doubleParser) throws Exception {
+
         final CloseableIterator<CsvRow> iterator =
                 CsvReader.builder().build(new InputStreamReader(in, StandardCharsets.UTF_8)).iterator();
         // Skip header row

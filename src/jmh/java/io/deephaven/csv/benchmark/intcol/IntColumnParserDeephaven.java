@@ -14,7 +14,7 @@ import java.util.List;
 
 public final class IntColumnParserDeephaven {
     public static BenchmarkResult<int[]> read(final InputStream in, final int[][] storage) throws Exception {
-        final SinkFactory sinkFactory = SinkFactories.makeSingleUseIntSinkFactory(storage);
+        final SinkFactory sinkFactory = SinkFactories.makeRecyclingSinkFactory(null, storage, null, null, null, null);
         final CsvSpecs specs = CsvSpecs.builder()
                 .parsers(List.of(Parsers.INT))
                 .hasHeaderRow(true)

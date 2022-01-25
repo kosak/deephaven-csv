@@ -7,84 +7,45 @@ import io.deephaven.csv.sinks.SinkFactory;
 import java.util.function.Supplier;
 
 public final class SinkFactories {
-    public static SinkFactory makeSingleUseIntSinkFactory(final int[][] storage) {
-        return SinkFactory.of(null, null,
-                null, null,
-                SinkSupplier.of(storage), null,
-                null, null,
+    public static SinkFactory makeRecyclingSinkFactory(byte[][] byteBuffers, int[][] intBuffers, long[][] longBuffers,
+            double[][] doubleBuffers, String[][] stringBuffers, long[][] datetimeAsLongBuffers) {
+        return SinkFactory.of(
                 null, null,
                 null, null,
-                null,
+                makeSupplier(intBuffers), null,
+                makeSupplier(longBuffers), null,
                 null, null,
+                makeSupplier(doubleBuffers), null,
+                makeSupplier(byteBuffers),
                 null, null,
-                null, null,
-                null, null);
-    }
-
-    public static SinkFactory makeSingleUseDoubleSinkFactory(final double[][] storage) {
-        return SinkFactory.of(null, null,
-                null, null,
-                null, null,
-                null, null,
-                null, null,
-                SinkSupplier.of(storage), null,
-                null,
-                null, null,
-                null, null,
-                null, null,
-                null, null);
-    }
-
-    public static SinkFactory makeSingleUseStringSinkFactory(final String[][] storage) {
-        return SinkFactory.of(null, null,
-                null, null,
-                null, null,
-                null, null,
-                null, null,
-                null, null,
-                null,
-                null, null,
-                SinkSupplier.of(storage), null,
-                null, null,
-                null, null);
-    }
-
-    public static SinkFactory makeSingleUseDateTimeAsLongSinkFactory(final long[][] storage) {
-        return SinkFactory.of(null, null,
-                null, null,
-                null, null,
-                null, null,
-                null, null,
-                null, null,
-                null,
-                null, null,
-                null, null,
-                SinkSupplier.of(storage), null,
+                makeSupplier(stringBuffers), null,
+                makeSupplier(datetimeAsLongBuffers), null,
                 null, null);
     }
 
     private interface SourceSink<TARRAY> extends Source<TARRAY>, Sink<TARRAY> {
     }
 
-    private static final class SinkSupplier<TARRAY> implements Supplier<SourceSink<TARRAY>> {
-        public static <TARRAY> SinkSupplier<TARRAY> of(final TARRAY[] items) {
-            return new SinkSupplier<>(items);
-        }
+    private static <TARRAY> Supplier<SourceSink<TARRAY>> makeSupplier(final TARRAY[] buffers) {
+        return buffers == null ? null : new RecyclingSinkSupplier<>(buffers);
+    }
 
-        private final TARRAY[] items;
+    private static final class RecyclingSinkSupplier<TARRAY> implements Supplier<SourceSink<TARRAY>> {
+        private final TARRAY[] buffers;
         private int nextIndex;
 
-        public SinkSupplier(TARRAY[] items) {
-            this.items = items;
+        public RecyclingSinkSupplier(TARRAY[] buffers) {
+            this.buffers = buffers;
             nextIndex = 0;
         }
 
         @Override
         public SourceSink<TARRAY> get() {
-            if (nextIndex == items.length) {
-                throw new RuntimeException("Ran out of items to supply.");
+            if (nextIndex == buffers.length) {
+                throw new RuntimeException("Ran out of buffers");
             }
-            return ArrayBackedSourceSink.of(items[nextIndex++]);
+            final SourceSink<TARRAY> result = ArrayBackedSourceSink.of(buffers[nextIndex++]);
+            return result;
         }
     }
 
@@ -93,7 +54,7 @@ public final class SinkFactories {
             return new ArrayBackedSourceSink<>(storage);
         }
 
-        private TARRAY storage;
+        private final TARRAY storage;
 
         public ArrayBackedSourceSink(final TARRAY storage) {
             this.storage = storage;

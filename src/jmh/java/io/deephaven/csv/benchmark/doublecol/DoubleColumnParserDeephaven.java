@@ -14,7 +14,7 @@ import java.util.List;
 
 public final class DoubleColumnParserDeephaven {
     public static BenchmarkResult<double[]> read(final InputStream in, final double[][] storage) throws Exception {
-        final SinkFactory sinkFactory = SinkFactories.makeSingleUseDoubleSinkFactory(storage);
+        final SinkFactory sinkFactory = SinkFactories.makeRecyclingSinkFactory(null, null, null, storage, null, null);
         final CsvSpecs specs = CsvSpecs.builder()
                 .parsers(List.of(Parsers.DOUBLE))
                 .hasHeaderRow(true)

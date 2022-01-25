@@ -14,7 +14,7 @@ import java.util.List;
 
 public final class DateTimeColumnParserDeephaven {
     public static BenchmarkResult<long[]> read(final InputStream in, final long[][] storage) throws Exception {
-        final SinkFactory sinkFactory = SinkFactories.makeSingleUseDateTimeAsLongSinkFactory(storage);
+        final SinkFactory sinkFactory = SinkFactories.makeRecyclingSinkFactory(null, null, null, null, null, storage);
         final CsvSpecs specs = CsvSpecs.builder()
                 .parsers(List.of(Parsers.DATETIME))
                 .hasHeaderRow(true)

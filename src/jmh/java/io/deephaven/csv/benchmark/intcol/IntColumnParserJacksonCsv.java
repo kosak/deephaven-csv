@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import io.deephaven.csv.benchmark.doublecol.DoubleColumnParserJacksonCsv;
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
 
 import java.io.InputStream;

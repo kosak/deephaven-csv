@@ -1,6 +1,7 @@
 package io.deephaven.csv.benchmark.doublecol;
 
 import io.deephaven.csv.benchmark.util.BenchmarkResult;
+import io.deephaven.csv.benchmark.util.Util;
 import org.simpleflatmapper.lightningcsv.CsvParser;
 
 import java.io.InputStream;
