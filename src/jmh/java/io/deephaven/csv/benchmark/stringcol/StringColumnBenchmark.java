@@ -49,7 +49,6 @@ public class StringColumnBenchmark {
                 }
                 sb.append('\n');
             }
-            System.out.println(sb);
             inputText = sb.toString().getBytes(StandardCharsets.UTF_8);
         }
 
