@@ -1,33 +1,49 @@
 package io.deephaven.csv.sinks;
 
 import java.lang.reflect.Array;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 public class ListSinkFactory {
-    public static SinkFactory createFactory() {
-        return SinkFactory.ofSimple(
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new,
-                ListSink::new
+    public static final SinkFactory INSTANCE = SinkFactory.ofSimple(
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, ListSinkFactory::convertToBoolean),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, UnaryOperator.identity()),
+                colNum -> new ListSink<>(colNum, ListSinkFactory::convertToInstant),
+                colNum -> new ListSink<>(colNum, ListSinkFactory::convertToInstant)
         );
+
+    private static Boolean convertToBoolean(Byte o) {
+        return o != 0;
+    }
+
+    private static Instant convertToInstant(Long totalNanos) {
+        if (totalNanos == null) {
+            System.out.println("HOW");
+        }
+        long seconds = totalNanos / 1_000_000_000;
+        long nanos = totalNanos % 1_000_000_000;
+        return Instant.ofEpochSecond(seconds, nanos);
     }
 }
 
-class ListSink<TARRAY> implements Sink<TARRAY> {
-    protected final List<Object> list;
+class ListSink<TARRAY, T, TARGET> implements Sink<TARRAY> {
+    private final List<TARGET> list;
+    private final Function<T, TARGET> converter;
 
-    protected ListSink(int colNum_ignored) {
+    public ListSink(int colNum, Function<T, TARGET> converter) {
+        // colNum is unused in this sink
         this.list = new ArrayList<>();
+        this.converter = converter;
     }
 
     @Override
@@ -51,13 +67,17 @@ class ListSink<TARRAY> implements Sink<TARRAY> {
 
         // Populate elements
         for (int i = 0; i < destSize; ++i) {
-            Object value = isNull[i] ? null : Array.get(src, i);
-            list.set(destBeginAsInt + i, value);
+            TARGET converted = null;
+            if (!isNull[i]) {
+                T element = (T)Array.get(src, i);
+                converted = converter.apply(element);
+            }
+            list.set(destBeginAsInt + i, converted);
         }
     }
 
     @Override
-    public Object getUnderlying() {
+    public List<TARGET> getUnderlying() {
         return list;
     }
 }

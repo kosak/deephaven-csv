@@ -14,6 +14,7 @@ import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.parsers.Parsers;
 import io.deephaven.csv.reading.CellGrabber;
 import io.deephaven.csv.reading.CsvReader;
+import io.deephaven.csv.sinks.ListSinkFactory;
 import io.deephaven.csv.sinks.Sink;
 import io.deephaven.csv.sinks.SinkFactory;
 import io.deephaven.csv.sinks.Source;
@@ -53,6 +54,10 @@ public class CsvReaderTest {
         public static final char NULL_CHAR = Character.MAX_VALUE;
         public static final long NULL_DATETIME_AS_LONG = Long.MIN_VALUE;
         public static final long NULL_TIMESTAMP_AS_LONG = Long.MIN_VALUE;
+    }
+
+    private static void repro() {
+        
     }
 
     /**
@@ -2036,10 +2041,12 @@ public class CsvReaderTest {
 
             final BiFunction<Class<?>, Class<?>, String> renderType =
                     (etype, rtype) -> {
+                        final String eName = etype == null ? "(null)" : etype.getCanonicalName();
+                        final String rName = rtype == null ? "(null)" : rtype.getCanonicalName();
                         if (etype == rtype) {
-                            return etype.getCanonicalName();
+                            return eName;  // which is the same as rName
                         }
-                        return etype.getCanonicalName() + "->" + rtype.getCanonicalName();
+                        return eName + "->" + rName;
                     };
 
             Renderer.renderList(
@@ -2136,6 +2143,12 @@ public class CsvReaderTest {
         }
 
         public Object getItem(int index) {
+            if (values instanceof List) {
+                return ((List<?>)values).get(index);
+            }
+            if (!values.getClass().isArray()) {
+                throw new RuntimeException("ZAMBONI TIME");
+            }
             return Array.get(values, index);
         }
     }
@@ -2259,18 +2272,7 @@ public class CsvReaderTest {
     }
 
     private static SinkFactory makeMySinkFactory() {
-        return SinkFactory.arrays(
-                Sentinels.NULL_BYTE,
-                Sentinels.NULL_SHORT,
-                Sentinels.NULL_INT,
-                Sentinels.NULL_LONG,
-                Sentinels.NULL_FLOAT,
-                Sentinels.NULL_DOUBLE,
-                Sentinels.NULL_BOOLEAN_AS_BYTE,
-                Sentinels.NULL_CHAR,
-                null,
-                Sentinels.NULL_DATETIME_AS_LONG,
-                Sentinels.NULL_TIMESTAMP_AS_LONG);
+        return ListSinkFactory.INSTANCE;
     }
 
     private static SinkFactory makeBlackholeSinkFactory() {
