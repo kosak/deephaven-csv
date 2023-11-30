@@ -56,8 +56,13 @@ public class CsvReaderTest {
         public static final long NULL_TIMESTAMP_AS_LONG = Long.MIN_VALUE;
     }
 
-    private static void repro() {
-        
+    @Test
+    public void repro() throws Exception {
+        final String filename = "/home/kosak/Downloads/navaids.csv";
+        final InputStream inputStream = new FileInputStream(filename);
+        final CsvSpecs specs = CsvSpecs.csv();
+        CsvReader.Result result = CsvReader.read(specs, inputStream, ListSinkFactory.INSTANCE);
+        System.out.println("hi");
     }
 
     /**
