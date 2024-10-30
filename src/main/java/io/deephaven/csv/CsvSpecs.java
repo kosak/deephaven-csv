@@ -123,6 +123,14 @@ public abstract class CsvSpecs {
         Builder hasFixedWidthColumns(boolean hasFixedWidthColumns);
 
         /**
+         * When {@link #hasFixedWidthColumns} is set, the library either determines the column widths from the header
+         * row (provided {@link #hasHeaderRow} is set), or the column widths can be specified explictly by the caller.
+         * If the caller wants to specify them explicitly, they can use this method.
+         * @param fixedColumnWidths The caller-specified widths of the columns.
+         */
+        Builder fixedColumnWidths(Iterable<Integer> fixedColumnWidths);
+
+        /**
          * Number of data rows to skip before processing data. This is useful when you want to parse data in chunks.
          * Typically used together with {@link Builder#numRows}. Defaults to 0.
          */
@@ -351,6 +359,14 @@ public abstract class CsvSpecs {
     @Default
     public boolean hasFixedWidthColumns() {
         return false;
+    }
+
+    /**
+     * See {@link Builder#fixedColumnWidths}.
+     */
+    @Default
+    public List<Integer> fixedColumnWidths() {
+        return Collections.emptyList();
     }
 
     /**

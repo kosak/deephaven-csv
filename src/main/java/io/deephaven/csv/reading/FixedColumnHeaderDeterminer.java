@@ -20,7 +20,7 @@ public class FixedColumnHeaderDeterminer {
             throws CsvReaderException {
         String[] headersToUse = null;
         // Get user-specified column widths, if they exist.
-        columnWidthsToUse = specs.fixedColumnWidths();
+        List<Integer> columnWidthsToUse = specs.fixedColumnWidths();
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
             String headerRow;
