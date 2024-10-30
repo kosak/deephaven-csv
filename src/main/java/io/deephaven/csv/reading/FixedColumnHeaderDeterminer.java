@@ -6,6 +6,7 @@ import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
 import io.deephaven.csv.util.MutableObject;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,16 +17,16 @@ public class FixedColumnHeaderDeterminer {
      * overrides.
      */
     private static String[] determineHeadersToUse(final CsvSpecs specs,
-                                                  final CellGrabber grabber, final MutableObject<byte[][]> firstDataRowHolder)
+                                                  final CellGrabber lineGrabber, final MutableObject<byte[][]> firstDataRowHolder)
             throws CsvReaderException {
         String[] headersToUse = null;
         // Get user-specified column widths, if they exist.
-        List<Integer> columnWidthsToUse = specs.fixedColumnWidths();
+        List<Integer> columnStartsToUse = specs.fixedColumnWidths();
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
-            String headerRow;
+            final ByteSlice headerRow = new ByteSlice();
             while (true) {
-                headerRow = tryReadOneRow(grabber);
+                headerRow = lineGrabber.grabNext();
                 if (headerRow == null) {
                     throw new CsvReaderException(
                             "Can't proceed because hasHeaderRow is set but input file is empty or shorter than skipHeaderRows");
@@ -35,8 +36,8 @@ public class FixedColumnHeaderDeterminer {
                 }
                 --skipCount;
             }
-            if (columnWidthsToUse == null) {
-                columnWidthsToUse = zamboniInferColWidths(headerRow);
+            if (columnStartsToUse == null) {
+                columnStartsToUse = inferColumnStarts(headerRow);
             }
 
             headersToUse = splittyTown666(headerRow);
@@ -66,27 +67,32 @@ public class FixedColumnHeaderDeterminer {
         also return columnWidthsToUse;
     }
 
-    /**
-     * Try to read one row from the input. Returns null if the input is empty
-     *
-     * @return The first row as a byte[][] or null if the input was exhausted.
-     */
-    private static byte[][] tryReadOneRow(final CellGrabber grabber) throws CsvReaderException {
-        final List<byte[]> headers = new ArrayList<>();
-
-        // Grab the header
-        final ByteSlice slice = new ByteSlice();
-        final MutableBoolean lastInRow = new MutableBoolean();
-        final MutableBoolean endOfInput = new MutableBoolean();
-        do {
-            grabber.grabNext(slice, lastInRow, endOfInput);
-            final byte[] item = new byte[slice.size()];
-            slice.copyTo(item, 0);
-            headers.add(item);
-        } while (!lastInRow.booleanValue());
-        if (headers.size() == 1 && headers.get(0).length == 0 && endOfInput.booleanValue()) {
-            return null;
+    private static int[] inferColumnStarts(ByteSlice row) {
+        // A column start is a non-delimiter character preceded by a delimiter (or present at the start of line).
+        // If the start of the line is a delimiter, that is an error.
+        final List<Integer> columnStarts = new ArrayList<>();
+        boolean prevCharIsDelimiter = true;
+        final byte[] data = row.data();
+        for (int i = row.begin(); i != row.end(); ++i) {
+            // If this character is not a delimiter, but the previous one was, then this is the start of a new column.
+            byte ch = data[i];
+            boolean thisCharIsDelimiter = ch == delimiterAsByte;
+            if (!thisCharIsDelimiter && prevCharIsDelimiter) {
+                columnStarts.add(i);
+            }
+            prevCharIsDelimiter = thisCharIsDelimiter;
+            int utf8Length = SuperPain.Utf8Length(ch);
+            i += utf8Length;
+            if (i > row.end()) {
+                final String message = String.format("0x%x at position %d doesn't look like a valid UTF-8 byte because there are not %d bytes left in the line",
+                        ch, i, utf8Length);
+                throw new CsvReaderException(message);
+            }
         }
-        return headers.toArray(new byte[0][]);
+        return columnStarts;
+    }
+
+    private static List<String> splittyTown666(ByteSlice row, int[] columnStarts) {
+
     }
 }

@@ -68,7 +68,7 @@ public final class CsvReader {
         }
     }
 
-    private static Result zamboniRead(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
+    private static Result originalZamboniRead(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
             throws CsvReaderException {
         // These two have already been validated by CsvSpecs to be 7-bit ASCII.
         final byte quoteAsByte = (byte) specs.quote();
