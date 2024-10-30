@@ -54,12 +54,17 @@ public final class CsvReader {
      *        the CsvReader determines what the column type is, it will use the {@link SinkFactory} to create an
      *        appropriate Sink&lt;T&gt; for the type. Note that the CsvReader might guess wrong, so it might create a
      *        Sink, partially populate it, and then abandon it. The final set of fully-populated Sinks will be returned
-     *        in in the CsvReader.Result. Thread safety: The {@link SinkFactory} may be invoked concurrently, therefore
+     *        in the CsvReader.Result. Thread safety: The {@link SinkFactory} may be invoked concurrently, therefore
      *        it must be thread safe.
      * @return A CsvReader.Result containing the column names, the number of columns, and the final set of
      *         fully-populated Sinks.
      */
     public static Result read(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
+            throws CsvReaderException {
+
+    }
+
+    private static Result zamboniRead(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
             throws CsvReaderException {
         // These two have already been validated by CsvSpecs to be 7-bit ASCII.
         final byte quoteAsByte = (byte) specs.quote();
@@ -69,7 +74,8 @@ public final class CsvReader {
                         specs.trim());
         // For an "out" parameter
         final MutableObject<byte[][]> firstDataRowHolder = new MutableObject<>();
-        final String[] headersTemp = determineHeadersToUse(specs, grabber, firstDataRowHolder);
+        final String[] headersTemp = DelimitedColumnHeaderDeterminer.determineHeadersToUse(specs, grabber,
+                firstDataRowHolder);
         final byte[][] firstDataRow = firstDataRowHolder.getValue();
         final int numInputCols = headersTemp.length;
 
@@ -199,62 +205,6 @@ public final class CsvReader {
         return specs.nullValueLiterals();
     }
 
-    /**
-     * Determine which headers to use. The result comes from either the first row of the file or the user-specified
-     * overrides.
-     */
-    private static String[] determineHeadersToUse(final CsvSpecs specs,
-            final CellGrabber grabber, final MutableObject<byte[][]> firstDataRowHolder)
-            throws CsvReaderException {
-        String[] headersToUse = null;
-        if (specs.hasHeaderRow()) {
-            long skipCount = specs.skipHeaderRows();
-            byte[][] headerRow;
-            while (true) {
-                headerRow = tryReadOneRow(grabber);
-                if (headerRow == null) {
-                    throw new CsvReaderException(
-                            "Can't proceed because hasHeaders is set but input file is empty");
-                }
-                if (skipCount == 0) {
-                    break;
-                }
-                --skipCount;
-            }
-            headersToUse = Arrays.stream(headerRow).map(String::new).toArray(String[]::new);
-        }
-
-        // Whether or not the input had headers, maybe override with client-specified headers.
-        if (specs.headers().size() != 0) {
-            headersToUse = specs.headers().toArray(new String[0]);
-        }
-
-        // If we still have nothing, try to generate synthetic column headers (works only if the file is
-        // non-empty, because we need to infer the column count).
-        final byte[][] firstDataRow;
-        if (headersToUse == null) {
-            firstDataRow = tryReadOneRow(grabber);
-            if (firstDataRow == null) {
-                throw new CsvReaderException(
-                        "Can't proceed because input file is empty and client has not specified headers");
-            }
-            headersToUse = new String[firstDataRow.length];
-            for (int ii = 0; ii < headersToUse.length; ++ii) {
-                headersToUse[ii] = "Column" + (ii + 1);
-            }
-        } else {
-            firstDataRow = null;
-        }
-
-        // Apply column specific overrides.
-        for (Map.Entry<Integer, String> entry : specs.headerForIndex().entrySet()) {
-            headersToUse[entry.getKey()] = entry.getValue();
-        }
-
-        firstDataRowHolder.setValue(firstDataRow);
-        return headersToUse;
-    }
-
     private static String[] canonicalizeHeaders(CsvSpecs specs, final String[] headers) throws CsvReaderException {
         final String[] legalized = specs.headerLegalizer().apply(headers);
         final Set<String> unique = new HashSet<>();
@@ -284,30 +234,6 @@ public final class CsvReader {
             sb.append(Renderer.renderList(invalidNames));
         }
         throw new CsvReaderException(sb.toString());
-    }
-
-    /**
-     * Try to read one row from the input. Returns null if the input is empty
-     *
-     * @return The first row as a byte[][] or null if the input was exhausted.
-     */
-    private static byte[][] tryReadOneRow(final CellGrabber grabber) throws CsvReaderException {
-        final List<byte[]> headers = new ArrayList<>();
-
-        // Grab the header
-        final ByteSlice slice = new ByteSlice();
-        final MutableBoolean lastInRow = new MutableBoolean();
-        final MutableBoolean endOfInput = new MutableBoolean();
-        do {
-            grabber.grabNext(slice, lastInRow, endOfInput);
-            final byte[] item = new byte[slice.size()];
-            slice.copyTo(item, 0);
-            headers.add(item);
-        } while (!lastInRow.booleanValue());
-        if (headers.size() == 1 && headers.get(0).length == 0 && endOfInput.booleanValue()) {
-            return null;
-        }
-        return headers.toArray(new byte[0][]);
     }
 
     /** Result of {@link #read}. Represents a set of columns. */
