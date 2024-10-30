@@ -3,6 +3,8 @@ package io.deephaven.csv.reading;
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.util.CsvReaderException;
+import io.deephaven.csv.util.MutableBoolean;
+import io.deephaven.csv.util.MutableObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,8 +15,10 @@ public class FixedHeaderFinder {
      * Determine which headers to use. The result comes from either the first row of the file or the user-specified
      * overrides.
      */
-    private static String[] determineHeadersToUse(final CsvSpecs specs,
-                                                  final CellGrabber lineGrabber)
+    public static String[] determineHeadersToUse(
+            final CsvSpecs specs,
+            final CellGrabber lineGrabber,
+            MutableObject<int[]> columnStartsResult)
             throws CsvReaderException {
         String[] headersToUse;
         // Get user-specified column widths, if any. If not, this will be an array of length 0.
@@ -22,9 +26,11 @@ public class FixedHeaderFinder {
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
             final ByteSlice headerRow = new ByteSlice();
+            MutableBoolean lastInRow = new MutableBoolean();
+            MutableBoolean endOfInput = new MutableBoolean();
             while (true) {
-                lineGrabber.grabNext(zamboniDest, lastInRow, endOfInput);
-                if (endOfInput.value()) {
+                lineGrabber.grabNext(headerRow, lastInRow, endOfInput);
+                if (endOfInput.booleanValue()) {
                     throw new CsvReaderException(
                             "Can't proceed because hasHeaderRow is set but input file is empty or shorter than skipHeaderRows");
                 }
@@ -47,7 +53,11 @@ public class FixedHeaderFinder {
 
         // Whether or not the input had headers, maybe override with client-specified headers.
         if (specs.headers().size() != 0) {
-            confirm_size_matches_then_take_it();
+            if (specs.headers().size() != headersToUse.length) {
+                final String message = String.format("Library determined %d headers; caller overrode with %d headers",
+                        headersToUse.length, specs.headers().size());
+                throw new CsvReaderException(message);
+            }
             headersToUse = specs.headers().toArray(new String[0]);
         }
 
@@ -56,8 +66,8 @@ public class FixedHeaderFinder {
             headersToUse[entry.getKey()] = entry.getValue();
         }
 
+        columnStartsResult.setValue(columnStartsToUse);
         return headersToUse;
-        also return columnWidthsToUse;
     }
 
     private static int[] inferColumnStarts(ByteSlice row) {
