@@ -61,7 +61,11 @@ public final class CsvReader {
      */
     public static Result read(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
             throws CsvReaderException {
-
+        if (specs.hasFixedWidthColumns()) {
+            doSomething();
+        } else {
+            doSomethingElse();
+        }
     }
 
     private static Result zamboniRead(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)

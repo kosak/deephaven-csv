@@ -7,7 +7,6 @@ import io.deephaven.csv.util.MutableBoolean;
 import io.deephaven.csv.util.MutableObject;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -20,43 +19,42 @@ public class FixedColumnHeaderDeterminer {
                                                   final CellGrabber grabber, final MutableObject<byte[][]> firstDataRowHolder)
             throws CsvReaderException {
         String[] headersToUse = null;
+        // Get user-specified column widths, if they exist.
+        columnWidthsToUse = specs.fixedColumnWidths();
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
-            byte[][] headerRow;
+            String headerRow;
             while (true) {
                 headerRow = tryReadOneRow(grabber);
                 if (headerRow == null) {
                     throw new CsvReaderException(
-                            "Can't proceed because hasHeaders is set but input file is empty");
+                            "Can't proceed because hasHeaderRow is set but input file is empty or shorter than skipHeaderRows");
                 }
                 if (skipCount == 0) {
                     break;
                 }
                 --skipCount;
             }
-            headersToUse = Arrays.stream(headerRow).map(String::new).toArray(String[]::new);
+            if (columnWidthsToUse == null) {
+                columnWidthsToUse = zamboniInferColWidths(headerRow);
+            }
+
+            headersToUse = splittyTown666(headerRow);
+        } else {
+            if (columnWidthsToUse == null) {
+                throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
+            }
+            headersToUse = new String[columnWidthsToUse.length];
+            for (int ii = 0; ii < headersToUse.length; ++ii) {
+                // TODO: put this in common code
+                headersToUse[ii] = "Column" + (ii + 1);
+            }
         }
 
         // Whether or not the input had headers, maybe override with client-specified headers.
         if (specs.headers().size() != 0) {
+            confirm_size_matches_then_take_it();
             headersToUse = specs.headers().toArray(new String[0]);
-        }
-
-        // If we still have nothing, try to generate synthetic column headers (works only if the file is
-        // non-empty, because we need to infer the column count).
-        final byte[][] firstDataRow;
-        if (headersToUse == null) {
-            firstDataRow = tryReadOneRow(grabber);
-            if (firstDataRow == null) {
-                throw new CsvReaderException(
-                        "Can't proceed because input file is empty and client has not specified headers");
-            }
-            headersToUse = new String[firstDataRow.length];
-            for (int ii = 0; ii < headersToUse.length; ++ii) {
-                headersToUse[ii] = "Column" + (ii + 1);
-            }
-        } else {
-            firstDataRow = null;
         }
 
         // Apply column specific overrides.
@@ -64,8 +62,8 @@ public class FixedColumnHeaderDeterminer {
             headersToUse[entry.getKey()] = entry.getValue();
         }
 
-        firstDataRowHolder.setValue(firstDataRow);
         return headersToUse;
+        also return columnWidthsToUse;
     }
 
     /**

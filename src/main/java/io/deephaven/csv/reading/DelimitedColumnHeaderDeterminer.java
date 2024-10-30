@@ -27,7 +27,7 @@ public class DelimitedColumnHeaderDeterminer {
                 headerRow = tryReadOneRow(grabber);
                 if (headerRow == null) {
                     throw new CsvReaderException(
-                            "Can't proceed because hasHeaders is set but input file is empty");
+                            "Can't proceed because hasHeaderRow is set but input file is empty or shorter than skipHeaderRows");
                 }
                 if (skipCount == 0) {
                     break;
