@@ -2,10 +2,12 @@ package io.deephaven.csv.reading;
 
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.containers.ByteSlice;
+import io.deephaven.csv.tokenization.Tokenizer;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
 import io.deephaven.csv.util.MutableObject;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +72,7 @@ public class FixedHeaderFinder {
         return headersToUse;
     }
 
-    private static int[] inferColumnStarts(ByteSlice row) {
+    private static int[] inferColumnStarts(ByteSlice row, byte delimiterAsByte) {
         // A column start is a non-delimiter character preceded by a delimiter (or present at the start of line).
         // If the start of the line is a delimiter, that is an error.
         final List<Integer> columnStarts = new ArrayList<>();
@@ -84,15 +86,24 @@ public class FixedHeaderFinder {
                 columnStarts.add(i);
             }
             prevCharIsDelimiter = thisCharIsDelimiter;
-            int utf8Length = SuperPain.Utf8Length(ch);
+            int utf8Length = Tokenizer.getUtf8Length(ch);
+            if (utf8Length == 4) {
+                String badChar = "[unknown]";
+                if (i + utf8Length <= row.end()) {
+                    badChar = new String(data, i, 4);
+                }
+                throw new IllegalStateException(
+                        String.format("The input character %s lies outside the Unicode Basic Multilingual Plane and is not supported in fixed column width mode",
+                        badChar));
+            }
             i += utf8Length;
             if (i > row.end()) {
-                final String message = String.format("0x%x at position %d doesn't look like a valid UTF-8 byte because there are not %d bytes left in the line",
-                        ch, i, utf8Length);
-                throw new CsvReaderException(message);
+                throw new IllegalStateException(String.format(
+                        "0x%x at position %d doesn't look like a valid UTF-8 byte because there are not %d bytes left in the line",
+                        ch, i, utf8Length));
             }
         }
-        return columnStarts;
+        return columnStarts.stream().mapToInt(Integer::intValue).toArray();
     }
 
     private static String[] splittyTown666(ByteSlice row, int[] columnStarts) {
