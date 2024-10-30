@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class FixedColumnHeaderDeterminer {
+public class FixedHeaderFinder {
     /**
      * Determine which headers to use. The result comes from either the first row of the file or the user-specified
      * overrides.
@@ -16,15 +16,15 @@ public class FixedColumnHeaderDeterminer {
     private static String[] determineHeadersToUse(final CsvSpecs specs,
                                                   final CellGrabber lineGrabber)
             throws CsvReaderException {
-        String[] headersToUse = null;
-        // Get user-specified column widths, if they exist.
-        List<Integer> columnStartsToUse = specs.fixedColumnWidths();
+        String[] headersToUse;
+        // Get user-specified column widths, if any. If not, this will be an array of length 0.
+        int[] columnStartsToUse = specs.fixedColumnWidths().stream().mapToInt(Integer::intValue).toArray();
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
             final ByteSlice headerRow = new ByteSlice();
             while (true) {
-                headerRow = lineGrabber.grabNext();
-                if (headerRow == null) {
+                lineGrabber.grabNext(zamboniDest, lastInRow, endOfInput);
+                if (endOfInput.value()) {
                     throw new CsvReaderException(
                             "Can't proceed because hasHeaderRow is set but input file is empty or shorter than skipHeaderRows");
                 }
@@ -37,11 +37,12 @@ public class FixedColumnHeaderDeterminer {
                 columnStartsToUse = inferColumnStarts(headerRow);
             }
 
-            headersToUse = splittyTown666(headerRow);
+            headersToUse = splittyTown666(headerRow, columnStartsToUse);
         } else {
             if (columnStartsToUse == null) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
             }
+            headersToUse = HeaderUtil.makeSyntheticHeaders(columnStartsToUse.length);
             headersToUse = new String[columnStartsToUse.length];
             for (int ii = 0; ii < headersToUse.length; ++ii) {
                 // TODO: put this in common code
@@ -89,7 +90,7 @@ public class FixedColumnHeaderDeterminer {
         return columnStarts;
     }
 
-    private static List<String> splittyTown666(ByteSlice row, int[] columnStarts) {
+    private static String[] splittyTown666(ByteSlice row, int[] columnStarts) {
         final byte[] data = row.data();
         for (int csIndex = 0; csIndex != columnStarts.length; ++csIndex) {
             final int begin = columnStarts[csIndex];

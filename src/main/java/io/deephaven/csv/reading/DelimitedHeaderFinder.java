@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public class DelimitedColumnHeaderDeterminer {
+public class DelimitedHeaderFinder {
     /**
      * Determine which headers to use. The result comes from either the first row of the file or the user-specified
      * overrides.

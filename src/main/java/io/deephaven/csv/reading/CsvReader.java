@@ -1,7 +1,6 @@
 package io.deephaven.csv.reading;
 
 import io.deephaven.csv.CsvSpecs;
-import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.densestorage.DenseStorageReader;
 import io.deephaven.csv.densestorage.DenseStorageWriter;
 import io.deephaven.csv.parsers.DataType;
@@ -78,7 +77,7 @@ public final class CsvReader {
                         specs.trim());
         // For an "out" parameter
         final MutableObject<byte[][]> firstDataRowHolder = new MutableObject<>();
-        final String[] headersTemp = DelimitedColumnHeaderDeterminer.determineHeadersToUse(specs, grabber,
+        final String[] headersTemp = DelimitedHeaderFinder.determineHeadersToUse(specs, grabber,
                 firstDataRowHolder);
         final byte[][] firstDataRow = firstDataRowHolder.getValue();
         final int numInputCols = headersTemp.length;
