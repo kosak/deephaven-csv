@@ -43,11 +43,6 @@ public class FixedHeaderFinder {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
             }
             headersToUse = HeaderUtil.makeSyntheticHeaders(columnStartsToUse.length);
-            headersToUse = new String[columnStartsToUse.length];
-            for (int ii = 0; ii < headersToUse.length; ++ii) {
-                // TODO: put this in common code
-                headersToUse[ii] = "Column" + (ii + 1);
-            }
         }
 
         // Whether or not the input had headers, maybe override with client-specified headers.
