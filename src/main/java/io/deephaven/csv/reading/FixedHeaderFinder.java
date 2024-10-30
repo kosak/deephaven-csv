@@ -7,7 +7,6 @@ import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
 import io.deephaven.csv.util.MutableObject;
 
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,7 @@ public class FixedHeaderFinder {
             throws CsvReaderException {
         String[] headersToUse;
         // Get user-specified column widths, if any. If not, this will be an array of length 0.
+        // UNITS: UTF8 CHARACTERS
         int[] columnStartsToUse = specs.fixedColumnWidths().stream().mapToInt(Integer::intValue).toArray();
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
@@ -41,11 +41,14 @@ public class FixedHeaderFinder {
                 }
                 --skipCount;
             }
-            if (columnStartsToUse == null) {
-                columnStartsToUse = inferColumnStarts(headerRow);
+            final byte paddingByte = (byte)specs.delimiter();
+            if (columnStartsToUse.length == 0) {
+                // UNITS: UTF8 CHARACTERS
+                columnStartsToUse = inferColumnStarts(headerRow, paddingByte);
             }
 
-            headersToUse = splittyTown666(headerRow, columnStartsToUse);
+            // DESIRED UNITS: UTF8 CHARACTERS
+            headersToUse = extractHeaders(headerRow, columnStartsToUse, paddingByte);
         } else {
             if (columnStartsToUse == null) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
@@ -68,52 +71,65 @@ public class FixedHeaderFinder {
             headersToUse[entry.getKey()] = entry.getValue();
         }
 
+        // DESIRED UNITS: UTF8 CHARACTERS
         columnStartsResult.setValue(columnStartsToUse);
         return headersToUse;
     }
 
+    // RETURNS UNITS: UTF8 CHARACTERS
     private static int[] inferColumnStarts(ByteSlice row, byte delimiterAsByte) {
         // A column start is a non-delimiter character preceded by a delimiter (or present at the start of line).
         // If the start of the line is a delimiter, that is an error.
         final List<Integer> columnStarts = new ArrayList<>();
         boolean prevCharIsDelimiter = true;
         final byte[] data = row.data();
+        int charIndex = 0;
         for (int i = row.begin(); i != row.end(); ++i) {
             // If this character is not a delimiter, but the previous one was, then this is the start of a new column.
             byte ch = data[i];
             boolean thisCharIsDelimiter = ch == delimiterAsByte;
             if (!thisCharIsDelimiter && prevCharIsDelimiter) {
-                columnStarts.add(i);
+                columnStarts.add(charIndex);
             }
             prevCharIsDelimiter = thisCharIsDelimiter;
-            int utf8Length = Tokenizer.getUtf8Length(ch);
-            if (utf8Length == 4) {
+            final int utf8Length = Tokenizer.getUtf8Length(ch);
+            if (utf8Length > 3) {
                 String badChar = "[unknown]";
                 if (i + utf8Length <= row.end()) {
-                    badChar = new String(data, i, 4);
+                    badChar = new String(data, i, utf8Length);
                 }
                 throw new IllegalStateException(
                         String.format("The input character %s lies outside the Unicode Basic Multilingual Plane and is not supported in fixed column width mode",
                         badChar));
             }
+            ++charIndex;
             i += utf8Length;
             if (i > row.end()) {
                 throw new IllegalStateException(String.format(
-                        "0x%x at position %d doesn't look like a valid UTF-8 byte because there are not %d bytes left in the line",
+                        "0x%x at position %d doesn't look like a valid UTF-8 sequence because there are not %d bytes left in the line",
                         ch, i, utf8Length));
             }
         }
         return columnStarts.stream().mapToInt(Integer::intValue).toArray();
     }
 
-    private static String[] splittyTown666(ByteSlice row, int[] columnStarts) {
+    // UNITS: UTF8 CHARACTERS
+    private static String[] extractHeaders(ByteSlice row, int[] columnWidths) {
         final byte[] data = row.data();
-        for (int csIndex = 0; csIndex != columnStarts.length; ++csIndex) {
-            final int begin = columnStarts[csIndex];
-            final int end = csIndex == columnStarts.length - 1 ? data.length : columnStarts[csIndex + 1];
-            superNubbin.reset(data, begin, end);
-            superNubbin.trim(delimiterAsByte);
-            result[csIndex] = superNubbin.toString();
+        final ByteSlice tempSlice = new ByteSlice();
+        final String[] result = new String[columnStarts.length];
+        int startByteIndex = 0;
+        int charIndex = 0;
+        int colIndex = 0;
+        while (true) {
+            if (charCount == columnWidths[superNubbin]) {
+                save_a_field();
+                ++superNubbin;
+                charCount = 0;
+                continue;
+            }
+            byteIndex = advanceByteIndex(row, byteIndex);
+            ++charCount;
         }
         return result;
     }

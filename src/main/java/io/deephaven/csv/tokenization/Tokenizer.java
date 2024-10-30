@@ -1,6 +1,7 @@
 package io.deephaven.csv.tokenization;
 
 import io.deephaven.csv.containers.ByteSlice;
+import io.deephaven.csv.reading.HeaderUtil;
 import io.deephaven.csv.util.*;
 
 import java.time.*;
@@ -260,12 +261,7 @@ public class Tokenizer {
          * @param bs Modified in place to remove leading and trailing whitespace, if any.
          */
         public static void trim(final ByteSlice bs) {
-            while (bs.begin() != bs.end() && RangeTests.isSpaceOrTab(bs.front())) {
-                bs.setBegin(bs.begin() + 1);
-            }
-            while (bs.begin() != bs.end() && RangeTests.isSpaceOrTab(bs.back())) {
-                bs.setEnd(bs.end() - 1);
-            }
+            HeaderUtil.trimWhitespace(bs);
         }
 
         /**

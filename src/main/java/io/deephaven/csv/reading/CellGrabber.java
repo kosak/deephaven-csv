@@ -94,12 +94,12 @@ public final class CellGrabber {
             ++offset;
             processQuotedMode(dest, lastInRow, endOfInput);
             if (trim) {
-                trimWhitespace(dest);
+                HeaderUtil.trimWhitespace(dest);
             }
         } else {
             processUnquotedMode(dest, lastInRow, endOfInput);
             if (ignoreSurroundingSpaces) {
-                trimWhitespace(dest);
+                HeaderUtil.trimWhitespace(dest);
             }
         }
     }
@@ -314,23 +314,5 @@ public final class CellGrabber {
 
     public int physicalRowNum() {
         return physicalRowNum;
-    }
-
-    /**
-     * Trim whitespace from the front and back of the slice.
-     *
-     * @param cs The slice, modified in-place to have whitespace (if any) removed.
-     */
-    private static void trimWhitespace(final ByteSlice cs) {
-        final byte[] data = cs.data();
-        int begin = cs.begin();
-        int end = cs.end();
-        while (begin != end && RangeTests.isSpaceOrTab(data[begin])) {
-            ++begin;
-        }
-        while (begin != end && RangeTests.isSpaceOrTab(data[end - 1])) {
-            --end;
-        }
-        cs.reset(data, begin, end);
     }
 }
