@@ -3,10 +3,7 @@ package io.deephaven.csv.reading;
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.util.CsvReaderException;
-import io.deephaven.csv.util.MutableBoolean;
-import io.deephaven.csv.util.MutableObject;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +14,7 @@ public class FixedColumnHeaderDeterminer {
      * overrides.
      */
     private static String[] determineHeadersToUse(final CsvSpecs specs,
-                                                  final CellGrabber lineGrabber, final MutableObject<byte[][]> firstDataRowHolder)
+                                                  final CellGrabber lineGrabber)
             throws CsvReaderException {
         String[] headersToUse = null;
         // Get user-specified column widths, if they exist.
@@ -42,10 +39,10 @@ public class FixedColumnHeaderDeterminer {
 
             headersToUse = splittyTown666(headerRow);
         } else {
-            if (columnWidthsToUse == null) {
+            if (columnStartsToUse == null) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
             }
-            headersToUse = new String[columnWidthsToUse.length];
+            headersToUse = new String[columnStartsToUse.length];
             for (int ii = 0; ii < headersToUse.length; ++ii) {
                 // TODO: put this in common code
                 headersToUse[ii] = "Column" + (ii + 1);
@@ -93,6 +90,14 @@ public class FixedColumnHeaderDeterminer {
     }
 
     private static List<String> splittyTown666(ByteSlice row, int[] columnStarts) {
-
+        final byte[] data = row.data();
+        for (int csIndex = 0; csIndex != columnStarts.length; ++csIndex) {
+            final int begin = columnStarts[csIndex];
+            final int end = csIndex == columnStarts.length - 1 ? data.length : columnStarts[csIndex + 1];
+            superNubbin.reset(data, begin, end);
+            superNubbin.trim(delimiterAsByte);
+            result[csIndex] = superNubbin.toString();
+        }
+        return result;
     }
 }
