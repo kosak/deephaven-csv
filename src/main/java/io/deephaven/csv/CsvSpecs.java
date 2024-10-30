@@ -118,6 +118,11 @@ public abstract class CsvSpecs {
         Builder headerValidator(Predicate<String> headerValidator);
 
         /**
+         * True if the input is organized into fixed width columns rather than delimited by a delimiter.
+         */
+        Builder hasFixedWidthColumns(boolean hasFixedWidthColumns);
+
+        /**
          * Number of data rows to skip before processing data. This is useful when you want to parse data in chunks.
          * Typically used together with {@link Builder#numRows}. Defaults to 0.
          */
@@ -338,6 +343,14 @@ public abstract class CsvSpecs {
     @Default
     public Predicate<String> headerValidator() {
         return c -> true;
+    }
+
+    /**
+     * See {@link Builder#hasFixedWidthColumns}.
+     */
+    @Default
+    public boolean hasFixedWidthColumns() {
+        return false;
     }
 
     /**

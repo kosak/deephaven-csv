@@ -1853,12 +1853,6 @@ public class CsvReaderTest {
     public void colnumPassedThrough() throws CsvReaderException {
         final String input = "" + "Col1,Col2,Col3\n" + "1,2,3\n" + "4,5,6\n" + "7,8,9\n";
 
-        final ColumnSet expected =
-                ColumnSet.of(
-                        Column.ofValues("Col1", 1, 4, 7),
-                        Column.ofValues("Col2", 2, 5, 8),
-                        Column.ofValues("Col3", 3, 6, 9));
-
         final InputStream inputStream = toInputStream(input);
         final CsvSpecs specs = defaultCsvSpecs();
         final SinkFactory sinkFactory = makeBlackholeSinkFactory();
@@ -1871,6 +1865,26 @@ public class CsvReaderTest {
         Assertions.assertThat(bh0Num).isEqualTo(0);
         Assertions.assertThat(bh1Num).isEqualTo(1);
         Assertions.assertThat(bh2Num).isEqualTo(2);
+    }
+
+    @Test
+    public void simpleFixedColumnWidths() throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOG  Dividend 0.25    200\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "Z     Dividend 0.18    500\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofValues("Col1", 1, 4, 7),
+                        Column.ofValues("Col2", 2, 5, 8),
+                        Column.ofValues("Col3", 3, 6, 9));
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).ignoreSurroundingSpaces(true).build();
+
+        invokeTest(specs, input, expected);
     }
 
     private static final class RepeatingInputStream extends InputStream {
