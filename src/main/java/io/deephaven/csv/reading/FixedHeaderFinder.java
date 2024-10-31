@@ -116,21 +116,22 @@ public class FixedHeaderFinder {
 
     // UNITS: UTF8 CHARACTERS
     private static String[] extractHeaders(ByteSlice row, int[] columnWidths) {
-        final byte[] data = row.data();
-        final ByteSlice tempSlice = new ByteSlice();
-        final String[] result = new String[columnStarts.length];
-        int byteIndex = 0;
-        int colIndex = 0;
-        int charCount = 0;
-        while (true) {
-            if (charCount == columnWidths[superNubbin]) {
-                save_a_field();
-                ++superNubbin;
-                charCount = 0;
-                continue;
-            }
-            byteIndex = advanceByteIndex(row, byteIndex);
-            ++charCount;
+        final int numCols = columnWidths.length;
+        if (numCols == 0) {
+            return new String[0];
+        }
+        final int[] byteWidths = new int[numCols];
+        final MutableInt excessBytes = new MutableInt();
+        charWidthsToByteWidths(row, columnWidths, byteWidths, excessBytes);
+        // Our policy is that the last column gets any excess bytes that are in the row.
+        byteWidths[numCols - 1] += excessBytes.intValue();
+        final String[] result = new String[numCols];
+
+        int beginByte = row.begin();
+        for (int colNum = 0; colNum != numCols; ++colNum) {
+            final int proposedEndByte = beginByte + byteWidths[colNum];
+            final int actualEndByte = Math.min(proposedEndByte, row.end());
+            result[colNum] = new String(row.data(), beginByte, actualEndByte - beginByte);
         }
         return result;
     }
