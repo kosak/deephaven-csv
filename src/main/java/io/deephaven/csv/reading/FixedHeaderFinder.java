@@ -5,6 +5,7 @@ import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.tokenization.Tokenizer;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
+import io.deephaven.csv.util.MutableInt;
 import io.deephaven.csv.util.MutableObject;
 
 import java.util.ArrayList;
@@ -118,9 +119,9 @@ public class FixedHeaderFinder {
         final byte[] data = row.data();
         final ByteSlice tempSlice = new ByteSlice();
         final String[] result = new String[columnStarts.length];
-        int startByteIndex = 0;
-        int charIndex = 0;
+        int byteIndex = 0;
         int colIndex = 0;
+        int charCount = 0;
         while (true) {
             if (charCount == columnWidths[superNubbin]) {
                 save_a_field();
@@ -132,5 +133,50 @@ public class FixedHeaderFinder {
             ++charCount;
         }
         return result;
+    }
+
+    private static void charWidthsToByteWidths(ByteSlice row, int[] charWidths, int[] byteWidths,
+                                               MutableInt excessBytes) {
+        int numCols = charWidths.length;
+        if (byteWidths.length != numCols) {
+            throw new IllegalArgumentException(String.format("Expected charWidths.length (%d) == byteWidths.length (%d)",
+                    charWidths.length, byteWidths.length));
+        }
+        int byteIndex = row.begin();
+        int byteStart = byteIndex;
+        int colIndex = 0;
+        int charCount = 0;
+        while (true) {
+            if (colIndex == numCols) {
+                excessBytes.setValue(byteIndex - byteStart);
+                return;
+            }
+            if (charCount == charWidths[colIndex]) {
+                byteWidths[colIndex] = byteIndex - byteStart;
+                byteStart = byteIndex;
+                charCount = 0;
+                ++colIndex;
+                continue;
+            }
+
+            byteIndex = advanceByteIndex(row, byteIndex);
+            ++charCount;
+        }
+    }
+
+    private static int advanceByteIndex(ByteSlice row, int byteIndex) {
+        final byte[] data = row.data();
+        final byte ch = data[byteIndex];
+        final int utf8Length = Tokenizer.getUtf8Length(ch);
+        if (utf8Length > 3) {
+            String badChar = "[unknown]";
+            if (byteIndex + utf8Length <= row.end()) {
+                badChar = new String(data, byteIndex, utf8Length);
+            }
+            throw new IllegalStateException(
+                    String.format("The input character %s lies outside the Unicode Basic Multilingual Plane and is not supported in fixed column width mode",
+                            badChar));
+        }
+        return byteIndex + utf8Length;
     }
 }
