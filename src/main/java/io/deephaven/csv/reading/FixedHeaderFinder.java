@@ -20,12 +20,12 @@ public class FixedHeaderFinder {
     public static String[] determineHeadersToUse(
             final CsvSpecs specs,
             final CellGrabber lineGrabber,
-            MutableObject<int[]> columnStartsResult)
+            MutableObject<int[]> columnWidthsResult)
             throws CsvReaderException {
         String[] headersToUse;
         // Get user-specified column widths, if any. If not, this will be an array of length 0.
         // UNITS: UTF8 CHARACTERS
-        int[] columnStartsToUse = specs.fixedColumnWidths().stream().mapToInt(Integer::intValue).toArray();
+        int[] columnWidthsToUse = specs.fixedColumnWidths().stream().mapToInt(Integer::intValue).toArray();
         if (specs.hasHeaderRow()) {
             long skipCount = specs.skipHeaderRows();
             final ByteSlice headerRow = new ByteSlice();
@@ -43,18 +43,18 @@ public class FixedHeaderFinder {
                 --skipCount;
             }
             final byte paddingByte = (byte)specs.delimiter();
-            if (columnStartsToUse.length == 0) {
+            if (columnWidthsToUse.length == 0) {
                 // UNITS: UTF8 CHARACTERS
-                columnStartsToUse = inferColumnStarts(headerRow, paddingByte);
+                columnWidthsToUse = inferColumnWidths(headerRow, paddingByte);
             }
 
             // DESIRED UNITS: UTF8 CHARACTERS
-            headersToUse = extractHeaders(headerRow, columnStartsToUse, paddingByte);
+            headersToUse = extractHeaders(headerRow, columnWidthsToUse, paddingByte);
         } else {
-            if (columnStartsToUse == null) {
+            if (columnWidthsToUse.length == 0) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
             }
-            headersToUse = HeaderUtil.makeSyntheticHeaders(columnStartsToUse.length);
+            headersToUse = HeaderUtil.makeSyntheticHeaders(columnWidthsToUse.length);
         }
 
         // Whether or not the input had headers, maybe override with client-specified headers.
@@ -73,55 +73,51 @@ public class FixedHeaderFinder {
         }
 
         // DESIRED UNITS: UTF8 CHARACTERS
-        columnStartsResult.setValue(columnStartsToUse);
+        columnWidthsResult.setValue(columnWidthsToUse);
         return headersToUse;
     }
 
     // RETURNS UNITS: UTF8 CHARACTERS
-    private static int[] inferColumnStarts(ByteSlice row, byte delimiterAsByte) {
+    private static int[] inferColumnWidths(ByteSlice row, byte delimiterAsByte) {
         // A column start is a non-delimiter character preceded by a delimiter (or present at the start of line).
         // If the start of the line is a delimiter, that is an error.
-        final List<Integer> columnStarts = new ArrayList<>();
-        boolean prevCharIsDelimiter = true;
+        final List<Integer> columnWidths = new ArrayList<>();
+        boolean prevCharIsDelimiter = false;
         final byte[] data = row.data();
         int charIndex = 0;
-        for (int i = row.begin(); i != row.end(); ++i) {
+        int charStartIndex = 0;
+        int byteIndex = row.begin();
+        while (true) {
+            if (byteIndex == row.end()) {
+                columnWidths.add(charIndex - charStartIndex);
+                return columnWidths.stream().mapToInt(Integer::intValue).toArray();
+            }
             // If this character is not a delimiter, but the previous one was, then this is the start of a new column.
-            byte ch = data[i];
+            byte ch = data[byteIndex];
             boolean thisCharIsDelimiter = ch == delimiterAsByte;
+            if (byteIndex == row.begin() && thisCharIsDelimiter) {
+                throw new IllegalArgumentException(
+                        String.format("Header row cannot start with the delimiter character '%c'", (char)delimiterAsByte));
+            }
             if (!thisCharIsDelimiter && prevCharIsDelimiter) {
-                columnStarts.add(charIndex);
+                columnWidths.add(charIndex - charStartIndex);
+                charStartIndex = charIndex;
             }
             prevCharIsDelimiter = thisCharIsDelimiter;
-            final int utf8Length = Tokenizer.getUtf8Length(ch);
-            if (utf8Length > 3) {
-                String badChar = "[unknown]";
-                if (i + utf8Length <= row.end()) {
-                    badChar = new String(data, i, utf8Length);
-                }
-                throw new IllegalStateException(
-                        String.format("The input character %s lies outside the Unicode Basic Multilingual Plane and is not supported in fixed column width mode",
-                        badChar));
-            }
             ++charIndex;
-            i += utf8Length;
-            if (i > row.end()) {
-                throw new IllegalStateException(String.format(
-                        "0x%x at position %d doesn't look like a valid UTF-8 sequence because there are not %d bytes left in the line",
-                        ch, i, utf8Length));
-            }
+            byteIndex = advanceByteIndex(row, byteIndex);
         }
-        return columnStarts.stream().mapToInt(Integer::intValue).toArray();
     }
 
     // UNITS: UTF8 CHARACTERS
-    private static String[] extractHeaders(ByteSlice row, int[] columnWidths) {
+    private static String[] extractHeaders(ByteSlice row, int[] columnWidths, byte paddingByte) {
         final int numCols = columnWidths.length;
         if (numCols == 0) {
             return new String[0];
         }
         final int[] byteWidths = new int[numCols];
         final MutableInt excessBytes = new MutableInt();
+        final ByteSlice tempSlice = new ByteSlice();
         charWidthsToByteWidths(row, columnWidths, byteWidths, excessBytes);
         // Our policy is that the last column gets any excess bytes that are in the row.
         byteWidths[numCols - 1] += excessBytes.intValue();
@@ -131,7 +127,10 @@ public class FixedHeaderFinder {
         for (int colNum = 0; colNum != numCols; ++colNum) {
             final int proposedEndByte = beginByte + byteWidths[colNum];
             final int actualEndByte = Math.min(proposedEndByte, row.end());
-            result[colNum] = new String(row.data(), beginByte, actualEndByte - beginByte);
+            tempSlice.reset(row.data(), beginByte, actualEndByte);
+            tempSlice.trimPadding(paddingByte);
+            result[colNum] = tempSlice.toString();
+            beginByte = actualEndByte;
         }
         return result;
     }
@@ -149,7 +148,7 @@ public class FixedHeaderFinder {
         int charCount = 0;
         while (true) {
             if (colIndex == numCols) {
-                excessBytes.setValue(byteIndex - byteStart);
+                excessBytes.setValue(row.end() - byteIndex);
                 return;
             }
             if (charCount == charWidths[colIndex]) {

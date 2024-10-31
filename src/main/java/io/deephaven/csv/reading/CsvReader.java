@@ -60,11 +60,14 @@ public final class CsvReader {
      */
     public static Result read(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
             throws CsvReaderException {
-        if (specs.hasFixedWidthColumns()) {
-            doSomething();
-        } else {
-            doSomethingElse();
+        if (!specs.hasFixedWidthColumns()) {
+            return originalZamboniRead(specs, stream, sinkFactory);
         }
+        byte IllegalUtf8 = (byte)0xff;
+        final CellGrabber lineGrabber = new CellGrabber(stream, IllegalUtf8, IllegalUtf8, true, false);
+        MutableObject<int[]> columnWidths = new MutableObject<>();
+        final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
+        throw new CsvReaderException("sad");
     }
 
     private static Result originalZamboniRead(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)

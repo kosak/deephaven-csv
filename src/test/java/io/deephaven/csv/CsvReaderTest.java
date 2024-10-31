@@ -1882,7 +1882,7 @@ public class CsvReaderTest {
                         Column.ofValues("Col2", 2, 5, 8),
                         Column.ofValues("Col3", 3, 6, 9));
 
-        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).ignoreSurroundingSpaces(true).build();
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true).build();
 
         invokeTest(specs, input, expected);
     }
