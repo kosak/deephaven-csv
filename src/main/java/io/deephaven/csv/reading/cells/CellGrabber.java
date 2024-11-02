@@ -1,14 +1,8 @@
 package io.deephaven.csv.reading.cells;
 
 import io.deephaven.csv.containers.ByteSlice;
-import io.deephaven.csv.containers.GrowableByteBuffer;
-import io.deephaven.csv.reading.headers.HeaderUtil;
-import io.deephaven.csv.tokenization.RangeTests;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
-
-import java.io.IOException;
-import java.io.InputStream;
 
 /**
  * This class is used to traverse over text from a Reader, understanding both field and line delimiters, as well as the

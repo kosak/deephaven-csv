@@ -165,20 +165,4 @@ public class FixedHeaderFinder {
         }
     }
 
-    private static int advanceByteIndex(ByteSlice row, int byteIndex) {
-        // zamboni_actually_allow_it_if_configured_will_advance_char_count_by_1_or_2;
-        final byte[] data = row.data();
-        final byte ch = data[byteIndex];
-        final int utf8Length = Tokenizer.getUtf8Length(ch);
-        if (utf8Length > 3) {
-            String badChar = "[unknown]";
-            if (byteIndex + utf8Length <= row.end()) {
-                badChar = new String(data, byteIndex, utf8Length);
-            }
-            throw new IllegalStateException(
-                    String.format("The input character %s lies outside the Unicode Basic Multilingual Plane and is not supported in fixed column width mode",
-                            badChar));
-        }
-        return byteIndex + utf8Length;
-    }
 }

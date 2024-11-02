@@ -1,7 +1,7 @@
 package io.deephaven.csv.reading.cells;
 
 import io.deephaven.csv.containers.ByteSlice;
-import io.deephaven.csv.reading.headers.HeaderUtil;
+import io.deephaven.csv.reading.ReaderUtil;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
 
@@ -65,7 +65,7 @@ public class FixedCellGrabber implements CellGrabber {
                 needToRefill = false;
             }
 
-            // There is data to return.
+            // There is data to return. Count off N characters
             final int cellBegin = colOffset;
             final int cellEnd = Math.min(colOffset + columnWidths[colIndex], rowText.end());
             ++colIndex;
@@ -77,10 +77,37 @@ public class FixedCellGrabber implements CellGrabber {
             endOfInput.setValue(false);
 
             if (ignoreSurroundingSpaces) {
-                HeaderUtil.trimWhitespace(dest);
+                ReaderUtil.trimWhitespace(dest);
             }
             return;
         }
+    }
+
+    private static void takeNCharactersInCharset(ByteSlice src, ByteSlice dest, int numCharsToTake,
+                                                 boolean utf32CountingMode) {
+        final byte[] data = src.data();
+        final int cellBegin = src.begin();
+        int current = cellBegin;
+        while (numCharsToTake > 0) {
+            if (current == src.end()) {
+                break;
+            }
+            final int utf8Length = ReaderUtil.getUtf8Length(data[current]);
+            final int charsConsumed = utf32CountingMode || utf8Length < 4 ? 1 : 2;
+            numCharsToTake -= charsConsumed;
+            if (numCharsToTake < 0) {
+                throw new RuntimeException(
+                        "While in UTF16 character counting mode, encountered a Unicode character outside the " +
+                        "Basic Multilingual Plane. This requires two Java chars to represent, but the fixed field " +
+                        "only has remainig space for one.");
+            }
+            current += utf8Length;
+            if (current > src.end()) {
+                throw new RuntimeException("Data error: partial UTF-8 sequence found in input");
+            }
+        }
+        dest.reset(src.data(), cellBegin, current);
+        src.reset(src.data(), current, src.end());
     }
 
     @Override

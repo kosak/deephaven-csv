@@ -1914,8 +1914,7 @@ public class CsvReaderTest {
     }
 
     /**
-     * We allow rows to be short
-     * @throws CsvReaderException
+     * As usual, we allow rows to be short
      */
     @Test
     public void fixedColumnWidthsShortRows() throws CsvReaderException {
@@ -1943,6 +1942,37 @@ public class CsvReaderTest {
         Assertions.assertThatThrownBy(() -> invokeTest(specsDisallowShortRows, input, expected))
                 .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
     }
+
+    /**
+     * We allow Unicode and we support two different character counting conventions.
+     */
+    @Test
+    public void unicodeWithUtf16CountingConvention() throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "♡♥❥❦◑╳Dividend 0.15    300\n"
+                        + "Z     Dividend 0.18    500\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", "GOOG", "T", "Z", "QQQ"),
+                        Column.ofRefs("Type", null, "Dividend", "Dividend", "Coupon"),
+                        Column.ofValues("Price", Sentinels.NULL_DOUBLE, 0.15, 0.18, Sentinels.NULL_DOUBLE),
+                        Column.ofValues("SecurityId", Sentinels.NULL_INT, 300, 500, Sentinels.NULL_INT));
+
+        final CsvSpecs.Builder partialSpecs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true);
+        final CsvSpecs specsAllowShortRows = partialSpecs.allowMissingColumns(true).build();
+        final CsvSpecs specsDisallowShortRows = partialSpecs.allowMissingColumns(false).build();
+
+        invokeTest(specsAllowShortRows, input, expected);
+
+        Assertions.assertThatThrownBy(() -> invokeTest(specsDisallowShortRows, input, expected))
+                .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
+    }
+
+
+
 
     private static final class RepeatingInputStream extends InputStream {
         private byte[] data;
