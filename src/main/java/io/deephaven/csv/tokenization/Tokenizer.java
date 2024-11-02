@@ -1,7 +1,7 @@
 package io.deephaven.csv.tokenization;
 
 import io.deephaven.csv.containers.ByteSlice;
-import io.deephaven.csv.reading.HeaderUtil;
+import io.deephaven.csv.reading.headers.HeaderUtil;
 import io.deephaven.csv.util.*;
 
 import java.time.*;

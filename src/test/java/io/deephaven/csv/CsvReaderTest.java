@@ -12,7 +12,7 @@ import io.deephaven.csv.parsers.DataType;
 import io.deephaven.csv.parsers.IteratorHolder;
 import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.parsers.Parsers;
-import io.deephaven.csv.reading.CellGrabber;
+import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.reading.CsvReader;
 import io.deephaven.csv.sinks.Sink;
 import io.deephaven.csv.sinks.SinkFactory;

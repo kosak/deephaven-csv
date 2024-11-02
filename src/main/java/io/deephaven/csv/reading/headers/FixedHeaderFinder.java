@@ -1,7 +1,8 @@
-package io.deephaven.csv.reading;
+package io.deephaven.csv.reading.headers;
 
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.containers.ByteSlice;
+import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.tokenization.Tokenizer;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;

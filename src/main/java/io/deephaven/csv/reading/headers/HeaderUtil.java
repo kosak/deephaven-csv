@@ -1,4 +1,4 @@
-package io.deephaven.csv.reading;
+package io.deephaven.csv.reading.headers;
 
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.tokenization.RangeTests;

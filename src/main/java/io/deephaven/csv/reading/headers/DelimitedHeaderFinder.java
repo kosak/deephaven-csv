@@ -1,7 +1,8 @@
-package io.deephaven.csv.reading;
+package io.deephaven.csv.reading.headers;
 
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.containers.ByteSlice;
+import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
 import io.deephaven.csv.util.MutableObject;
@@ -17,7 +18,7 @@ public class DelimitedHeaderFinder {
      * overrides.
      */
     public static String[] determineHeadersToUse(final CsvSpecs specs,
-                                                  final CellGrabber grabber, final MutableObject<byte[][]> firstDataRowHolder)
+                                                 final CellGrabber grabber, final MutableObject<byte[][]> firstDataRowHolder)
             throws CsvReaderException {
         String[] headersToUse = null;
         if (specs.hasHeaderRow()) {
