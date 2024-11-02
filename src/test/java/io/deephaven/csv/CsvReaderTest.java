@@ -14,6 +14,7 @@ import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.parsers.Parsers;
 import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.reading.CsvReader;
+import io.deephaven.csv.reading.cells.DelimitedCellGrabber;
 import io.deephaven.csv.sinks.Sink;
 import io.deephaven.csv.sinks.SinkFactory;
 import io.deephaven.csv.sinks.Source;
@@ -60,7 +61,7 @@ public class CsvReaderTest {
      */
     @Test
     public void bug2133() throws CsvReaderException {
-        final int bufferSize = CellGrabber.BUFFER_SIZE;
+        final int bufferSize = DelimitedCellGrabber.BUFFER_SIZE;
         final StringBuilder sb = new StringBuilder("Values\r");
         final int numAs = bufferSize - sb.length() - 1;
         final String expected1 = repeat("a", numAs);

@@ -6,6 +6,7 @@ import io.deephaven.csv.densestorage.DenseStorageWriter;
 import io.deephaven.csv.parsers.DataType;
 import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.reading.cells.CellGrabber;
+import io.deephaven.csv.reading.cells.DelimitedCellGrabber;
 import io.deephaven.csv.reading.headers.DelimitedHeaderFinder;
 import io.deephaven.csv.reading.headers.FixedHeaderFinder;
 import io.deephaven.csv.sinks.Sink;
@@ -67,7 +68,7 @@ public final class CsvReader {
             return originalZamboniRead(specs, stream, sinkFactory);
         }
         byte IllegalUtf8 = (byte)0xff;
-        final CellGrabber lineGrabber = new CellGrabber(stream, IllegalUtf8, IllegalUtf8, true, false);
+        final CellGrabber lineGrabber = new DelimitedCellGrabber(stream, IllegalUtf8, IllegalUtf8, true, false);
         MutableObject<int[]> columnWidths = new MutableObject<>();
         final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
         throw new CsvReaderException("sad");
@@ -79,7 +80,7 @@ public final class CsvReader {
         final byte quoteAsByte = (byte) specs.quote();
         final byte delimiterAsByte = (byte) specs.delimiter();
         final CellGrabber grabber =
-                new CellGrabber(stream, quoteAsByte, delimiterAsByte, specs.ignoreSurroundingSpaces(),
+                new DelimitedCellGrabber(stream, quoteAsByte, delimiterAsByte, specs.ignoreSurroundingSpaces(),
                         specs.trim());
         // For an "out" parameter
         final MutableObject<byte[][]> firstDataRowHolder = new MutableObject<>();
