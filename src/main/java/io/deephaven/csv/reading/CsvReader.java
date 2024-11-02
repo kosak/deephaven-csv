@@ -7,6 +7,7 @@ import io.deephaven.csv.parsers.DataType;
 import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.reading.cells.DelimitedCellGrabber;
+import io.deephaven.csv.reading.cells.FixedCellGrabber;
 import io.deephaven.csv.reading.headers.DelimitedHeaderFinder;
 import io.deephaven.csv.reading.headers.FixedHeaderFinder;
 import io.deephaven.csv.sinks.Sink;
@@ -67,7 +68,7 @@ public final class CsvReader {
         if (!specs.hasFixedWidthColumns()) {
             return originalZamboniRead(specs, stream, sinkFactory);
         }
-        final CellGrabber lineGrabber = new DelimitedCellGrabber(stream, IllegalUtf8, IllegalUtf8, true, false);
+        final CellGrabber lineGrabber = FixedCellGrabber.makeLineGrabber(stream);
         MutableObject<int[]> columnWidths = new MutableObject<>();
         final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
         throw new CsvReaderException("sad");
