@@ -27,59 +27,47 @@ public class FixedCellGrabber implements CellGrabber {
     private final CellGrabber lineGrabber;
     private final int[] columnWidths;
     private final boolean ignoreSurroundingSpaces;
-    private boolean needToRefill;
+    private final boolean utf32CountingMode;
     private final ByteSlice rowText;
     private int colIndex;
-    private int colOffset;
     private final MutableBoolean dummy;
 
     /** Constructor. */
-    public FixedCellGrabber(final CellGrabber lineGrabber, final int[] columnWidths, boolean ignoreSurroundingSpaces) {
+    public FixedCellGrabber(final CellGrabber lineGrabber, final int[] columnWidths, boolean ignoreSurroundingSpaces,
+                            boolean utf32CountingMode) {
         this.lineGrabber = lineGrabber;
         this.columnWidths = columnWidths;
         this.ignoreSurroundingSpaces = ignoreSurroundingSpaces;
-        this.needToRefill = true;
+        this.utf32CountingMode = utf32CountingMode;
         this.rowText = new ByteSlice();
         this.colIndex = 0;
-        this.colOffset = 0;
         this.dummy = new MutableBoolean();
     }
 
     @Override
     public void grabNext(ByteSlice dest, MutableBoolean lastInRow, MutableBoolean endOfInput) throws CsvReaderException {
-        while (true) {
-            if (needToRefill) {
-                // Underlying row used up, and all columns provided. Ask underlying CellGrabber for the next line.
-                lineGrabber.grabNext(rowText, dummy, endOfInput);
+        if (rowText.size() == 0) {
+            // Underlying row used up, and all columns provided. Ask underlying CellGrabber for the next line.
+            lineGrabber.grabNext(rowText, dummy, endOfInput);
 
-                if (endOfInput.booleanValue()) {
-                    // Set dest to the empty string, and leave 'endOfInput' set to true.
-                    dest.reset(rowText.data(), rowText.end(), rowText.end());
-                    // Leave 'endOfInput' set to true and return
-                    return;
-                }
-
-                colIndex = 0;
-                colOffset = rowText.begin();
-                // There is a new underlying input line, so restart the logic from the top.
-                needToRefill = false;
+            if (endOfInput.booleanValue()) {
+                // Set dest to the empty string, and leave 'endOfInput' set to true.
+                dest.reset(rowText.data(), rowText.end(), rowText.end());
+                return;
             }
 
-            // There is data to return. Count off N characters
-            final int cellBegin = colOffset;
-            final int cellEnd = Math.min(colOffset + columnWidths[colIndex], rowText.end());
-            ++colIndex;
-            colOffset = cellEnd;
-
-            dest.reset(rowText.data(), cellBegin, cellEnd);
-            needToRefill = cellEnd == rowText.end();
-            lastInRow.setValue(needToRefill);
-            endOfInput.setValue(false);
-
-            if (ignoreSurroundingSpaces) {
-                ReaderUtil.trimWhitespace(dest);
-            }
+            colIndex = 0;
             return;
+        }
+
+        // There is data to return. Count off N characters
+        takeNCharactersInCharset(rowText, dest, columnWidths[colIndex], utf32CountingMode);
+        ++colIndex;
+        lastInRow.setValue(rowText.size() == 0);
+        endOfInput.setValue(false);
+
+        if (ignoreSurroundingSpaces) {
+            ReaderUtil.trimWhitespace(dest);
         }
     }
 

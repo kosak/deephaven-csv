@@ -65,38 +65,4 @@ public class ReaderUtil {
         throw new IllegalStateException(String.format("0x%x is not a valid starting byte for a UTF-8 sequence",
                 firstByte));
     }
-
-    /**
-     * Look at the UTF-8 characters pointed to by 'row', at the current byteOffset.
-     * Ensure that there are enough bytes remaining in row for the full UTF-8 character. Otherwise, throw an Exception.
-     * If utf32CountingMode is true or the ch, set numChar
-     * If the character is in the Basic Multilingual Plane, or if utf32CountingMode is true, set
-     * numChars to 1. Otherw
-     *
-     * Return the width of that UTF-8 character.
-     * @param row
-     * @param byteIndex
-     * @param utf32coutingMode
-     * @param numChars
-     * @return
-     */
-    public static int advanceOneChar(ByteSlice row, int byteOffset, boolean utf32CountingMode, MutableInt numChars) {
-        // zamboni_actually_allow_it_if_configured_will_advance_char_count_by_1_or_2;
-        final byte[] data = row.data();
-        final byte ch = data[byteIndex];
-        final int utf8Length = getUtf8Length(ch);
-        numChars.setValue(1);
-        if (utf8Length > 3) {
-            String badChar = "[unknown]";
-            if (byteIndex + utf8Length <= row.end()) {
-                badChar = new String(data, byteIndex, utf8Length);
-            }
-            throw new IllegalStateException(
-                    String.format("The input character %s lies outside the Unicode Basic Multilingual Plane and is not supported in fixed column width mode",
-                            badChar));
-        }
-
-        return byteIndex + utf8Length;
-    }
-
 }
