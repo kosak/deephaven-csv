@@ -54,6 +54,8 @@ public class FixedCellGrabber implements CellGrabber {
                 lineGrabber.grabNext(rowText, dummy, endOfInput);
 
                 if (endOfInput.booleanValue()) {
+                    // Set dest to the empty string, and leave 'endOfInput' set to true.
+                    dest.reset(rowText.data(), rowText.end(), rowText.end());
                     // Leave 'endOfInput' set to true and return
                     return;
                 }
