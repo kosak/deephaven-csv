@@ -165,6 +165,7 @@ public class FixedHeaderFinder {
     }
 
     private static int advanceByteIndex(ByteSlice row, int byteIndex) {
+        // zamboni_actually_allow_it_if_configured_will_advance_char_count_by_1_or_2;
         final byte[] data = row.data();
         final byte ch = data[byteIndex];
         final int utf8Length = Tokenizer.getUtf8Length(ch);
