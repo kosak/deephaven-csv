@@ -2,6 +2,7 @@ package io.deephaven.csv.reading.headers;
 
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.containers.ByteSlice;
+import io.deephaven.csv.reading.ReaderUtil;
 import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.tokenization.Tokenizer;
 import io.deephaven.csv.util.CsvReaderException;
@@ -55,7 +56,7 @@ public class FixedHeaderFinder {
             if (columnWidthsToUse.length == 0) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
             }
-            headersToUse = HeaderUtil.makeSyntheticHeaders(columnWidthsToUse.length);
+            headersToUse = ReaderUtil.makeSyntheticHeaders(columnWidthsToUse.length);
         }
 
         // Whether or not the input had headers, maybe override with client-specified headers.

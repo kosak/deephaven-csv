@@ -2,8 +2,6 @@ package io.deephaven.csv.reading;
 
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.tokenization.RangeTests;
-import io.deephaven.csv.tokenization.Tokenizer;
-import io.deephaven.csv.util.MutableInt;
 
 public class ReaderUtil {
     public static String[] makeSyntheticHeaders(int numHeaders) {

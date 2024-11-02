@@ -2,6 +2,7 @@ package io.deephaven.csv.reading.cells;
 
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.containers.GrowableByteBuffer;
+import io.deephaven.csv.reading.ReaderUtil;
 import io.deephaven.csv.tokenization.RangeTests;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
@@ -85,12 +86,12 @@ public final class DelimitedCellGrabber implements CellGrabber {
             ++offset;
             processQuotedMode(dest, lastInRow, endOfInput);
             if (trim) {
-                HeaderUtil.trimWhitespace(dest);
+                ReaderUtil.trimWhitespace(dest);
             }
         } else {
             processUnquotedMode(dest, lastInRow, endOfInput);
             if (ignoreSurroundingSpaces) {
-                HeaderUtil.trimWhitespace(dest);
+                ReaderUtil.trimWhitespace(dest);
             }
         }
     }
