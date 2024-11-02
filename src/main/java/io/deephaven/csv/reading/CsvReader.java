@@ -71,7 +71,9 @@ public final class CsvReader {
         final CellGrabber lineGrabber = FixedCellGrabber.makeLineGrabber(stream);
         MutableObject<int[]> columnWidths = new MutableObject<>();
         final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
-        throw new CsvReaderException("sad");
+        final int numCols = headers.length;
+        final CellGrabber grabber = new FixedCellGrabber(lineGrabber, columnWidths.getValue());
+        return zamboni2(specs, grabber, null, numCols, numCols, headers, sinkFactory);
     }
 
     private static Result originalZamboniRead(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
@@ -101,6 +103,13 @@ public final class CsvReader {
         final int numOutputCols = headersTemp2.length;
         final String[] headersToUse = canonicalizeHeaders(specs, headersTemp2);
 
+        return zamboni2(specs, grabber, firstDataRow, numInputCols, numOutputCols, headersToUse, sinkFactory);
+    }
+
+    private static Result zamboni2(final CsvSpecs specs, CellGrabber grabber, byte[][] optionalFirstDataRow,
+                                   int numInputCols, int numOutputCols,
+                                   String[] headersToUse, final SinkFactory sinkFactory)
+            throws CsvReaderException {
         final String[][] nullValueLiteralsToUse = new String[numOutputCols][];
         for (int ii = 0; ii < numOutputCols; ++ii) {
             nullValueLiteralsToUse[ii] =
@@ -136,7 +145,7 @@ public final class CsvReader {
 
         // Start the writer.
         final Future<Object> numRowsFuture = ecs.submit(() -> ParseInputToDenseStorage.doit(headersToUse,
-                firstDataRow, grabber, specs, nullValueLiteralsToUse, dsws));
+                optionalFirstDataRow, grabber, specs, nullValueLiteralsToUse, dsws));
 
         // Start the readers, taking care to not hold a reference to the DenseStorageReader.
         final ArrayList<Future<Object>> sinkFutures = new ArrayList<>();
