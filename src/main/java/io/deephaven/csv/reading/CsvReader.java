@@ -67,7 +67,6 @@ public final class CsvReader {
         if (!specs.hasFixedWidthColumns()) {
             return originalZamboniRead(specs, stream, sinkFactory);
         }
-        byte IllegalUtf8 = (byte)0xff;
         final CellGrabber lineGrabber = new DelimitedCellGrabber(stream, IllegalUtf8, IllegalUtf8, true, false);
         MutableObject<int[]> columnWidths = new MutableObject<>();
         final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
