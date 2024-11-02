@@ -72,7 +72,8 @@ public final class CsvReader {
         MutableObject<int[]> columnWidths = new MutableObject<>();
         final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
         final int numCols = headers.length;
-        final CellGrabber grabber = new FixedCellGrabber(lineGrabber, columnWidths.getValue());
+        final CellGrabber grabber = new FixedCellGrabber(lineGrabber, columnWidths.getValue(),
+                specs.ignoreSurroundingSpaces());
         return zamboni2(specs, grabber, null, numCols, numCols, headers, sinkFactory);
     }
 
