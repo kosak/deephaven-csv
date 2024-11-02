@@ -65,21 +65,6 @@ public class FixedCellGrabber implements CellGrabber {
                 needToRefill = false;
             }
 
-            // Is there more data to provide from this row?
-            if (colOffset == rowText.end()) {
-                // Underlying row used up. Did the underlying row provide all expected cells?
-                if (colIndex < columnWidths.length) {
-                    // Input row didn't provide all expected cells. Return empty cells as padding.
-                    dest.reset(rowText.data(), rowText.end(), rowText.end());
-                    ++colIndex;
-                    lastInRow.setValue(colIndex == columnWidths.length);
-                    endOfInput.setValue(false);
-                    return;
-                }
-                needToRefill = true;
-                continue;
-            }
-
             // There is data to return.
             final int cellBegin = colOffset;
             final int cellEnd = Math.min(colOffset + columnWidths[colIndex], rowText.end());
@@ -87,7 +72,8 @@ public class FixedCellGrabber implements CellGrabber {
             colOffset = cellEnd;
 
             dest.reset(rowText.data(), cellBegin, cellEnd);
-            lastInRow.setValue(colIndex == columnWidths.length);
+            needToRefill = cellEnd == rowText.end();
+            lastInRow.setValue(needToRefill);
             endOfInput.setValue(false);
 
             if (ignoreSurroundingSpaces) {

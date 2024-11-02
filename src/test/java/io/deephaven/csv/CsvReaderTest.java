@@ -23,6 +23,7 @@ import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.Renderer;
 import org.apache.commons.io.input.ReaderInputStream;
 import org.assertj.core.api.Assertions;
+import org.assertj.core.api.ThrowableAssert;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -1913,7 +1914,7 @@ public class CsvReaderTest {
     }
 
     /**
-     * We allow data fields to fill the whole cell, without a padding character
+     * We allow rows to be short
      * @throws CsvReaderException
      */
     @Test
@@ -1933,9 +1934,14 @@ public class CsvReaderTest {
                         Column.ofValues("Price", Sentinels.NULL_DOUBLE, 0.15, 0.18, Sentinels.NULL_DOUBLE),
                         Column.ofValues("SecurityId", Sentinels.NULL_INT, 300, 500, Sentinels.NULL_INT));
 
-        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true).build();
+        final CsvSpecs.Builder partialSpecs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true);
+        final CsvSpecs specsAllowShortRows = partialSpecs.allowMissingColumns(true).build();
+        final CsvSpecs specsDisallowShortRows = partialSpecs.allowMissingColumns(false).build();
 
-        invokeTest(specs, input, expected);
+        invokeTest(specsAllowShortRows, input, expected);
+
+        Assertions.assertThatThrownBy(() -> invokeTest(specsDisallowShortRows, input, expected))
+                .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
     }
 
     private static final class RepeatingInputStream extends InputStream {
