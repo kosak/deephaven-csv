@@ -12,7 +12,6 @@ import io.deephaven.csv.parsers.DataType;
 import io.deephaven.csv.parsers.IteratorHolder;
 import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.parsers.Parsers;
-import io.deephaven.csv.reading.cells.CellGrabber;
 import io.deephaven.csv.reading.CsvReader;
 import io.deephaven.csv.reading.cells.DelimitedCellGrabber;
 import io.deephaven.csv.sinks.Sink;
@@ -1879,9 +1878,60 @@ public class CsvReaderTest {
 
         final ColumnSet expected =
                 ColumnSet.of(
-                        Column.ofValues("Col1", 1, 4, 7),
-                        Column.ofValues("Col2", 2, 5, 8),
-                        Column.ofValues("Col3", 3, 6, 9));
+                        Column.ofRefs("Sym", "GOOG", "T", "Z"),
+                        Column.ofRefs("Type", "Dividend", "Dividend", "Dividend"),
+                        Column.ofValues("Price", 0.25, 0.15, 0.18),
+                        Column.ofValues("SecurityId", 200, 300, 500));
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
+     * We allow data fields to fill the whole cell, without a padding character
+     * @throws CsvReaderException
+     */
+    @Test
+    public void fixedColumnWidthsFullCell() throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOGLEDividend!0.25    200\n"
+                        + "T     Dividend 0.15    300\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", "GOOGLE", "T"),
+                        Column.ofRefs("Type", "Dividend!", "Dividend"),
+                        Column.ofValues("Price", 0.25, 0.15),
+                        Column.ofValues("SecurityId", 200, 300));
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
+     * We allow data fields to fill the whole cell, without a padding character
+     * @throws CsvReaderException
+     */
+    @Test
+    public void fixedColumnWidthsShortRows() throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOG\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "Z     Dividend 0.18    500\n"
+                        + "QQQ   Coupon\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", "GOOG", "T", "Z", "QQQ"),
+                        Column.ofRefs("Type", null, "Dividend", "Dividend", "Coupon"),
+                        Column.ofValues("Price", Sentinels.NULL_DOUBLE, 0.15, 0.18, Sentinels.NULL_DOUBLE),
+                        Column.ofValues("SecurityId", Sentinels.NULL_INT, 300, 500, Sentinels.NULL_INT));
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true).build();
 
