@@ -1948,11 +1948,11 @@ public class CsvReaderTest {
 
     /**
      * All six Unicode characters ♡♥❥❦◑╳ are in the Basic Multilingual Plane and can all be represented
-     * with a single Java char. Therefore, they work with both counting conventions.
+     * with a single Java char. Therefore, they are counted the same with both counting conventions.
      */
     @ParameterizedTest
     @ValueSource(booleans =  {false, true})
-    public void SupportsBMPCharactersInBothCountingConventions(boolean useUtf32CountingConvention) throws CsvReaderException {
+    public void CountsBMPCharactersTheSameInBothCountingConventions(boolean useUtf32CountingConvention) throws CsvReaderException {
         final String input =
                 ""
                         + "Sym   Type     Price   SecurityId\n"
@@ -1965,6 +1965,39 @@ public class CsvReaderTest {
                         Column.ofRefs("Type", "Dividend", "Dividend"),
                         Column.ofValues("Price", 0.15, 0.18),
                         Column.ofValues("SecurityId", 300, 500));
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
+                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
+     * All six Unicode characters 🥰😻🧡💓💕💖 are outside the Basic Multilingual Plane and all are represented
+     * with two Java chars. The Sym column has a width of six. They will fit in the "Sym" column if the caller
+     * uses UTF-32 counting convention. They will not fit in the column if the caller uses the UTF-16 counting
+     * convention (because it takes 12 Java chars to express them).
+     */
+    @ParameterizedTest
+    @ValueSource(booleans =  {false, true})
+    public void SupportsBMPCharactersInBothCountingConventions(boolean useUtf32CountingConvention) throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type\n"
+                        + "🥰😻🧡💓💕💖Dividend\n"
+                        + "Z     Dividend\n";
+
+        final ColumnSet expected;
+
+        if (useUtf32CountingConvention) {
+            expected = ColumnSet.of(
+                    Column.ofRefs("Sym", "🥰😻🧡💓💕💖", "Z"),
+                    Column.ofRefs("Type", "Dividend", "Dividend"));
+        } else {
+            expected = ColumnSet.of(
+                    Column.ofRefs("Sym", "🥰😻🧡", "Z"),
+                    Column.ofRefs("Type", "💓💕💖Dividend", "Dividend"));
+        }
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
                 .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
