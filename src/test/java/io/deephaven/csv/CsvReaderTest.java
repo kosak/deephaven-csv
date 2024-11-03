@@ -23,7 +23,6 @@ import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.Renderer;
 import org.apache.commons.io.input.ReaderInputStream;
 import org.assertj.core.api.Assertions;
-import org.assertj.core.api.ThrowableAssert;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -2001,6 +2000,35 @@ public class CsvReaderTest {
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
                 .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
+     * Addresses <a href="https://github.com/deephaven/deephaven-csv/issues/212"> A user requested that the library
+     * be able to read files like this.
+     */
+    @Test
+    public void bug212() throws CsvReaderException {
+        final String input =
+                ""
+                        + "NAME                     STATUS       AGE      LABELS\n"
+                        + "argo-events              Not Active   2y77d    app.kubernetes.io/instance=argo-events,kubernetes.io/metadata.name=argo-events\n"
+                        + "argo-workflows           Active       2y77d    app.kubernetes.io/instance=argo-workflows,kubernetes.io/metadata.name=argo-workflows\n"
+                        + "argocd                   Active       5y18d    kubernetes.io/metadata.name=argocd\n"
+                        + "beta                     Not Active   4y235d   kubernetes.io/metadata.name=beta\n";
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
+                .ignoreSurroundingSpaces(true).build();
+
+        final ColumnSet expected = ColumnSet.of(
+                Column.ofRefs("NAME", "argo-events", "argo-workflows", "argocd", "beta"),
+                Column.ofRefs("STATUS", "Not Active", "Active", "Active", "Not Active"),
+                Column.ofRefs("AGE", "2y77d", "2y77d", "5y18d", "4y235d"),
+                Column.ofRefs("LABELS", "app.kubernetes.io/instance=argo-events,kubernetes.io/metadata.name=argo-events",
+                        "app.kubernetes.io/instance=argo-workflows,kubernetes.io/metadata.name=argo-workflows",
+                        "kubernetes.io/metadata.name=argocd",
+                        "kubernetes.io/metadata.name=beta"));
 
         invokeTest(specs, input, expected);
     }
