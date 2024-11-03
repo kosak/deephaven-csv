@@ -29,6 +29,7 @@ public class FixedCellGrabber implements CellGrabber {
     private final boolean ignoreSurroundingSpaces;
     private final boolean utf32CountingMode;
     private final ByteSlice rowText;
+    private boolean needsUnderlyingRefresh;
     private int colIndex;
     private final MutableBoolean dummy;
 
@@ -40,13 +41,14 @@ public class FixedCellGrabber implements CellGrabber {
         this.ignoreSurroundingSpaces = ignoreSurroundingSpaces;
         this.utf32CountingMode = utf32CountingMode;
         this.rowText = new ByteSlice();
+        this.needsUnderlyingRefresh = true;
         this.colIndex = 0;
         this.dummy = new MutableBoolean();
     }
 
     @Override
     public void grabNext(ByteSlice dest, MutableBoolean lastInRow, MutableBoolean endOfInput) throws CsvReaderException {
-        if (rowText.size() == 0) {
+        if (needsUnderlyingRefresh) {
             // Underlying row used up, and all columns provided. Ask underlying CellGrabber for the next line.
             lineGrabber.grabNext(rowText, dummy, endOfInput);
 
@@ -56,14 +58,15 @@ public class FixedCellGrabber implements CellGrabber {
                 return;
             }
 
+            needsUnderlyingRefresh = false;
             colIndex = 0;
-            return;
         }
 
         // There is data to return. Count off N characters
         takeNCharactersInCharset(rowText, dest, columnWidths[colIndex], utf32CountingMode);
         ++colIndex;
-        lastInRow.setValue(rowText.size() == 0);
+        needsUnderlyingRefresh = colIndex == columnWidths.length;
+        lastInRow.setValue(needsUnderlyingRefresh);
         endOfInput.setValue(false);
 
         if (ignoreSurroundingSpaces) {
