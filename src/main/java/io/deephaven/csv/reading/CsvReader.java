@@ -73,7 +73,7 @@ public final class CsvReader {
         final String[] headers = FixedHeaderFinder.determineHeadersToUse(specs, lineGrabber, columnWidths);
         final int numCols = headers.length;
         final CellGrabber grabber = new FixedCellGrabber(lineGrabber, columnWidths.getValue(),
-                specs.ignoreSurroundingSpaces(), specs.utf32CountingMode());
+                specs.ignoreSurroundingSpaces(), specs.useUtf32CountingConvention());
         return zamboni2(specs, grabber, null, numCols, numCols, headers, sinkFactory);
     }
 

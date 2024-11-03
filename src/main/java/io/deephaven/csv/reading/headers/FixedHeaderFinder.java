@@ -47,11 +47,11 @@ public class FixedHeaderFinder {
             final byte paddingByte = (byte)specs.delimiter();
             if (columnWidthsToUse.length == 0) {
                 // UNITS: UTF8 CHARACTERS
-                columnWidthsToUse = inferColumnWidths(headerRow, paddingByte, specs.utf32CountingMode());
+                columnWidthsToUse = inferColumnWidths(headerRow, paddingByte, specs.useUtf32CountingConvention());
             }
 
             // DESIRED UNITS: UTF8 CHARACTERS
-            headersToUse = extractHeaders(headerRow, columnWidthsToUse, paddingByte, specs.utf32CountingMode());
+            headersToUse = extractHeaders(headerRow, columnWidthsToUse, paddingByte, specs.useUtf32CountingConvention());
         } else {
             if (columnWidthsToUse.length == 0) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
@@ -80,7 +80,7 @@ public class FixedHeaderFinder {
     }
 
     // RETURNS UNITS: UTF8 CHARACTERS
-    private static int[] inferColumnWidths(ByteSlice row, byte delimiterAsByte, boolean utf32CountingMode) {
+    private static int[] inferColumnWidths(ByteSlice row, byte delimiterAsByte, boolean useUtf32CountingConvention) {
         // A column start is a non-delimiter character preceded by a delimiter (or present at the start of line).
         // If the start of the line is a delimiter, that is an error.
         final List<Integer> columnWidths = new ArrayList<>();
@@ -106,7 +106,7 @@ public class FixedHeaderFinder {
                 numChars = 0;
             }
             prevCharIsDelimiter = thisCharIsDelimiter;
-            byteIndex += ReaderUtil.getUtf8LengthAndCharLength(ch, utf32CountingMode, charCountResult);
+            byteIndex += ReaderUtil.getUtf8LengthAndCharLength(ch, useUtf32CountingConvention, charCountResult);
             numChars += charCountResult.intValue();
         }
     }

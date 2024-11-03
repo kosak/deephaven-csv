@@ -144,7 +144,7 @@ public abstract class CsvSpecs {
          * matches the visual width of the column). But some programs may want the value of false because they
          * are counting Java chars.
          */
-        Builder utf32CountingMode(boolean utf32CountingMode);
+        Builder useUtf32CountingConvention(boolean useUtf32CountingConvention);
 
         /**
          * Number of data rows to skip before processing data. This is useful when you want to parse data in chunks.
@@ -386,10 +386,10 @@ public abstract class CsvSpecs {
     }
 
     /**
-     * See {@link Builder#utf32CountingMode}.
+     * See {@link Builder#useUtf32CountingConvention}.
      */
     @Default
-    public boolean utf32CountingMode() {
+    public boolean useUtf32CountingConvention() {
         return true;
     }
 

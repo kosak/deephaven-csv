@@ -27,6 +27,8 @@ import org.assertj.core.api.ThrowableAssert;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.*;
 import java.lang.reflect.Array;
@@ -1909,15 +1911,15 @@ public class CsvReaderTest {
                         Column.ofValues("SecurityId", 200, 300));
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true).build();
-
         invokeTest(specs, input, expected);
     }
 
     /**
      * As usual, we allow rows to be short
      */
-    @Test
-    public void fixedColumnWidthsShortRows() throws CsvReaderException {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void fixedColumnWidthsShortRows(boolean allowMissingColumns) throws CsvReaderException {
         final String input =
                 ""
                         + "Sym   Type     Price   SecurityId\n"
@@ -1933,21 +1935,24 @@ public class CsvReaderTest {
                         Column.ofValues("Price", Sentinels.NULL_DOUBLE, 0.15, 0.18, Sentinels.NULL_DOUBLE),
                         Column.ofValues("SecurityId", Sentinels.NULL_INT, 300, 500, Sentinels.NULL_INT));
 
-        final CsvSpecs.Builder partialSpecs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true);
-        final CsvSpecs specsAllowShortRows = partialSpecs.allowMissingColumns(true).build();
-        final CsvSpecs specsDisallowShortRows = partialSpecs.allowMissingColumns(false).build();
+        final CsvSpecs specs  = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
+                .ignoreSurroundingSpaces(true).allowMissingColumns(allowMissingColumns).build();
 
-        invokeTest(specsAllowShortRows, input, expected);
-
-        Assertions.assertThatThrownBy(() -> invokeTest(specsDisallowShortRows, input, expected))
-                .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
+        if (allowMissingColumns) {
+            invokeTest(specs, input, expected);
+        } else {
+            Assertions.assertThatThrownBy(() -> invokeTest(specs, input, expected))
+                    .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
+        }
     }
 
     /**
-     * We allow Unicode and we support two different character counting conventions.
+     * All six Unicode characters ♡♥❥❦◑╳ are in the Basic Multilingual Plane and can all be represented
+     * with a single Java char. Therefore, they work with both counting conventions.
      */
-    @Test
-    public void unicodeWithUtf16CountingConvention() throws CsvReaderException {
+    @ParameterizedTest
+    @ValueSource(booleans =  {false, true})
+    public void SupportsBMPCharactersInBothCountingConventions(boolean useUtf32CountingConvention) throws CsvReaderException {
         final String input =
                 ""
                         + "Sym   Type     Price   SecurityId\n"
@@ -1956,23 +1961,16 @@ public class CsvReaderTest {
 
         final ColumnSet expected =
                 ColumnSet.of(
-                        Column.ofRefs("Sym", "GOOG", "T", "Z", "QQQ"),
-                        Column.ofRefs("Type", null, "Dividend", "Dividend", "Coupon"),
-                        Column.ofValues("Price", Sentinels.NULL_DOUBLE, 0.15, 0.18, Sentinels.NULL_DOUBLE),
-                        Column.ofValues("SecurityId", Sentinels.NULL_INT, 300, 500, Sentinels.NULL_INT));
+                        Column.ofRefs("Sym", "♡♥❥❦◑╳", "Z"),
+                        Column.ofRefs("Type", "Dividend", "Dividend"),
+                        Column.ofValues("Price", 0.15, 0.18),
+                        Column.ofValues("SecurityId", 300, 500));
 
-        final CsvSpecs.Builder partialSpecs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ').ignoreSurroundingSpaces(true);
-        final CsvSpecs specsAllowShortRows = partialSpecs.allowMissingColumns(true).build();
-        final CsvSpecs specsDisallowShortRows = partialSpecs.allowMissingColumns(false).build();
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
+                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
 
-        invokeTest(specsAllowShortRows, input, expected);
-
-        Assertions.assertThatThrownBy(() -> invokeTest(specsDisallowShortRows, input, expected))
-                .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
+        invokeTest(specs, input, expected);
     }
-
-
-
 
     private static final class RepeatingInputStream extends InputStream {
         private byte[] data;

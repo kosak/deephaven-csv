@@ -65,10 +65,10 @@ public class ReaderUtil {
                 firstByte));
     }
 
-    public static int getUtf8LengthAndCharLength(byte firstByte, boolean utf32CountingMode,
+    public static int getUtf8LengthAndCharLength(byte firstByte, boolean useUtf32CountingConvention,
                                                  MutableInt charCountResult) {
         final int utf8Length = getUtf8Length(firstByte);
-        final int numChars = utf32CountingMode || utf8Length < 4 ? 1 : 2;
+        final int numChars = useUtf32CountingConvention || utf8Length < 4 ? 1 : 2;
         charCountResult.setValue(numChars);
         return utf8Length;
     }
