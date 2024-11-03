@@ -47,11 +47,11 @@ public class FixedHeaderFinder {
             final byte paddingByte = (byte)specs.delimiter();
             if (columnWidthsToUse.length == 0) {
                 // UNITS: UTF8 CHARACTERS
-                columnWidthsToUse = inferColumnWidths(headerRow, paddingByte);
+                columnWidthsToUse = inferColumnWidths(headerRow, paddingByte, specs.utf32CountingMode());
             }
 
             // DESIRED UNITS: UTF8 CHARACTERS
-            headersToUse = extractHeaders(headerRow, columnWidthsToUse, paddingByte);
+            headersToUse = extractHeaders(headerRow, columnWidthsToUse, paddingByte, specs.utf32CountingMode());
         } else {
             if (columnWidthsToUse.length == 0) {
                 throw new CsvReaderException("Can't proceed because hasHeaderRow is false but fixedColumnWidths is unspecified");
@@ -80,18 +80,18 @@ public class FixedHeaderFinder {
     }
 
     // RETURNS UNITS: UTF8 CHARACTERS
-    private static int[] inferColumnWidths(ByteSlice row, byte delimiterAsByte) {
+    private static int[] inferColumnWidths(ByteSlice row, byte delimiterAsByte, boolean utf32CountingMode) {
         // A column start is a non-delimiter character preceded by a delimiter (or present at the start of line).
         // If the start of the line is a delimiter, that is an error.
         final List<Integer> columnWidths = new ArrayList<>();
+        final MutableInt charCountResult = new MutableInt();
         boolean prevCharIsDelimiter = false;
         final byte[] data = row.data();
-        int charIndex = 0;
-        int charStartIndex = 0;
+        int numChars = 0;
         int byteIndex = row.begin();
         while (true) {
             if (byteIndex == row.end()) {
-                columnWidths.add(charIndex - charStartIndex);
+                columnWidths.add(numChars);
                 return columnWidths.stream().mapToInt(Integer::intValue).toArray();
             }
             // If this character is not a delimiter, but the previous one was, then this is the start of a new column.
@@ -102,27 +102,27 @@ public class FixedHeaderFinder {
                         String.format("Header row cannot start with the delimiter character '%c'", (char)delimiterAsByte));
             }
             if (!thisCharIsDelimiter && prevCharIsDelimiter) {
-                columnWidths.add(charIndex - charStartIndex);
-                charStartIndex = charIndex;
+                columnWidths.add(numChars);
+                numChars = 0;
             }
             prevCharIsDelimiter = thisCharIsDelimiter;
-            ++charIndex;
-            byteIndex = advanceByteIndex(row, byteIndex);
+            byteIndex += ReaderUtil.getUtf8LengthAndCharLength(ch, utf32CountingMode, charCountResult);
+            numChars += charCountResult.intValue();
         }
     }
 
     // UNITS: UTF8 CHARACTERS
-    private static String[] extractHeaders(ByteSlice row, int[] columnWidths, byte paddingByte) {
+    private static String[] extractHeaders(ByteSlice row, int[] columnWidths, byte paddingByte,
+                                           boolean utf32CountingMode) {
         final int numCols = columnWidths.length;
         if (numCols == 0) {
             return new String[0];
         }
         final int[] byteWidths = new int[numCols];
-        final MutableInt excessBytes = new MutableInt();
         final ByteSlice tempSlice = new ByteSlice();
-        charWidthsToByteWidths(row, columnWidths, byteWidths, excessBytes);
+        final int excessBytes = charWidthsToByteWidths(row, columnWidths, utf32CountingMode, byteWidths);
         // Our policy is that the last column gets any excess bytes that are in the row.
-        byteWidths[numCols - 1] += excessBytes.intValue();
+        byteWidths[numCols - 1] += excessBytes;
         final String[] result = new String[numCols];
 
         int beginByte = row.begin();
@@ -137,33 +137,35 @@ public class FixedHeaderFinder {
         return result;
     }
 
-    private static void charWidthsToByteWidths(ByteSlice row, int[] charWidths, int[] byteWidths,
-                                               MutableInt excessBytes) {
+    private static int charWidthsToByteWidths(ByteSlice row, int[] charWidths, boolean utf32CountingMode,
+                                              int[] byteWidths) {
         int numCols = charWidths.length;
         if (byteWidths.length != numCols) {
             throw new IllegalArgumentException(String.format("Expected charWidths.length (%d) == byteWidths.length (%d)",
                     charWidths.length, byteWidths.length));
         }
-        int byteIndex = row.begin();
-        int byteStart = byteIndex;
+        final MutableInt charCountResult = new MutableInt();
+        final byte[] data = row.data();
+        int byteCurrent = row.begin();
+        int byteStart = byteCurrent;
         int colIndex = 0;
         int charCount = 0;
         while (true) {
             if (colIndex == numCols) {
-                excessBytes.setValue(row.end() - byteIndex);
-                return;
+                // Excess bytes not claimed by any column
+                return row.end() - byteCurrent;
             }
             if (charCount == charWidths[colIndex]) {
-                byteWidths[colIndex] = byteIndex - byteStart;
-                byteStart = byteIndex;
+                byteWidths[colIndex] = byteCurrent - byteStart;
+                byteStart = byteCurrent;
                 charCount = 0;
                 ++colIndex;
                 continue;
             }
 
-            byteIndex = advanceByteIndex(row, byteIndex);
-            ++charCount;
+            final byte ch = data[byteCurrent];
+            byteCurrent += ReaderUtil.getUtf8LengthAndCharLength(ch, utf32CountingMode, charCountResult);
+            charCount += charCountResult.intValue();
         }
     }
-
 }

@@ -2,6 +2,7 @@ package io.deephaven.csv.reading;
 
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.tokenization.RangeTests;
+import io.deephaven.csv.util.MutableInt;
 
 public class ReaderUtil {
     public static String[] makeSyntheticHeaders(int numHeaders) {
@@ -62,5 +63,13 @@ public class ReaderUtil {
         }
         throw new IllegalStateException(String.format("0x%x is not a valid starting byte for a UTF-8 sequence",
                 firstByte));
+    }
+
+    public static int getUtf8LengthAndCharLength(byte firstByte, boolean utf32CountingMode,
+                                                 MutableInt charCountResult) {
+        final int utf8Length = getUtf8Length(firstByte);
+        final int numChars = utf32CountingMode || utf8Length < 4 ? 1 : 2;
+        charCountResult.setValue(numChars);
+        return utf8Length;
     }
 }
