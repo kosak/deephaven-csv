@@ -2062,12 +2062,12 @@ public class CsvReaderTest {
 
         if (useUtf32CountingConvention) {
             expected = ColumnSet.of(
-                    Column.ofRefs("🥰😻🧡", "╔═╤═╗", "Z"),
-                    Column.ofRefs("Type", "Dividend", "Dividend"));
+                    Column.ofRefs("🥰😻🧡", "abc"),
+                    Column.ofRefs("╔═╤═╗", "defgh"));
         } else {
             expected = ColumnSet.of(
-                    Column.ofRefs("🥰😻🧡", "╔═╤═╗", "Z"),
-                    Column.ofRefs("Type", "💓💕💖Dividend", "Dividend"));
+                    Column.ofRefs("🥰😻🧡", "abc def"),
+                    Column.ofRefs("╔═╤═╗", "gh"));
         }
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
@@ -2075,6 +2075,8 @@ public class CsvReaderTest {
 
         invokeTest(specs, input, expected);
     }
+
+    // do the test where you break up a surrogate pair
 
 
     private static final class RepeatingInputStream extends InputStream {
