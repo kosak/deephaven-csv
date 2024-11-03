@@ -62,10 +62,12 @@ public class FixedCellGrabber implements CellGrabber {
             colIndex = 0;
         }
 
-        // There is data to return. Count off N characters
-        takeNCharactersInCharset(rowText, dest, columnWidths[colIndex], utf32CountingMode);
+        // There is data to return. Count off N characters. The final column gets all remaining characters.
+        final boolean lastCol  = colIndex == columnWidths.length - 1;
+        final int numCharsToTake = lastCol ? Integer.MAX_VALUE : columnWidths[colIndex];
+        takeNCharactersInCharset(rowText, dest, numCharsToTake, utf32CountingMode);
         ++colIndex;
-        needsUnderlyingRefresh = colIndex == columnWidths.length;
+        needsUnderlyingRefresh = lastCol || dest.size() == 0;
         lastInRow.setValue(needsUnderlyingRefresh);
         endOfInput.setValue(false);
 
