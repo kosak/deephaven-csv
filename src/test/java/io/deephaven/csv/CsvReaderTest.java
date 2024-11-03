@@ -1869,6 +1869,35 @@ public class CsvReaderTest {
         Assertions.assertThat(bh2Num).isEqualTo(2);
     }
 
+    /**
+     * Addresses <a href="https://github.com/deephaven/deephaven-csv/issues/212"> A user requested that the library
+     * be able to read files like this.
+     */
+    @Test
+    public void bug212() throws CsvReaderException {
+        final String input =
+                ""
+                        + "NAME                     STATUS       AGE      LABELS\n"
+                        + "argo-events              Not Active   2y77d    app.kubernetes.io/instance=argo-events,kubernetes.io/metadata.name=argo-events\n"
+                        + "argo-workflows           Active       2y77d    app.kubernetes.io/instance=argo-workflows,kubernetes.io/metadata.name=argo-workflows\n"
+                        + "argocd                   Active       5y18d    kubernetes.io/metadata.name=argocd\n"
+                        + "beta                     Not Active   4y235d   kubernetes.io/metadata.name=beta\n";
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
+                .ignoreSurroundingSpaces(true).build();
+
+        final ColumnSet expected = ColumnSet.of(
+                Column.ofRefs("NAME", "argo-events", "argo-workflows", "argocd", "beta"),
+                Column.ofRefs("STATUS", "Not Active", "Active", "Active", "Not Active"),
+                Column.ofRefs("AGE", "2y77d", "2y77d", "5y18d", "4y235d"),
+                Column.ofRefs("LABELS", "app.kubernetes.io/instance=argo-events,kubernetes.io/metadata.name=argo-events",
+                        "app.kubernetes.io/instance=argo-workflows,kubernetes.io/metadata.name=argo-workflows",
+                        "kubernetes.io/metadata.name=argocd",
+                        "kubernetes.io/metadata.name=beta"));
+
+        invokeTest(specs, input, expected);
+    }
+
     @Test
     public void simpleFixedColumnWidths() throws CsvReaderException {
         final String input =
@@ -1951,7 +1980,7 @@ public class CsvReaderTest {
      */
     @ParameterizedTest
     @ValueSource(booleans =  {false, true})
-    public void CountsBMPCharactersTheSameInBothCountingConventions(boolean useUtf32CountingConvention) throws CsvReaderException {
+    public void countsBMPCharactersTheSame(boolean useUtf32CountingConvention) throws CsvReaderException {
         final String input =
                 ""
                         + "Sym   Type     Price   SecurityId\n"
@@ -1972,14 +2001,14 @@ public class CsvReaderTest {
     }
 
     /**
-     * All six Unicode characters 🥰😻🧡💓💕💖 are outside the Basic Multilingual Plane and all are represented
+     * All six Unicode characters 🥰😻🧡💓💕💖 are _outside_ the Basic Multilingual Plane and all are represented
      * with two Java chars. The Sym column has a width of six. They will fit in the "Sym" column if the caller
      * uses UTF-32 counting convention. They will not fit in the column if the caller uses the UTF-16 counting
      * convention (because it takes 12 Java chars to express them).
      */
     @ParameterizedTest
     @ValueSource(booleans =  {false, true})
-    public void SupportsBMPCharactersInBothCountingConventions(boolean useUtf32CountingConvention) throws CsvReaderException {
+    public void countsNonBMPCharactersDifferently(boolean useUtf32CountingConvention) throws CsvReaderException {
         final String input =
                 ""
                         + "Sym   Type\n"
@@ -2005,33 +2034,48 @@ public class CsvReaderTest {
     }
 
     /**
-     * Addresses <a href="https://github.com/deephaven/deephaven-csv/issues/212"> A user requested that the library
-     * be able to read files like this.
+     * Using Unicode characters as column headers. We give one column a header with characters from the BMP
+     * and one with characters outside the BMP and show how the behavior differs depending on the
+     * useUtf32CountingConvention flag.
+     * ╔═╗
+     * All six Unicode characters 🥰😻🧡💓💕💖 are _outside_ the Basic Multilingual Plane and all are represented
+     * with two Java chars. The Sym column has a width of six. They will fit in the "Sym" column if the caller
+     * uses UTF-32 counting convention. They will not fit in the column if the caller uses the UTF-16 counting
+     * convention (because it takes 12 Java chars to express them).
      */
-    @Test
-    public void bug212() throws CsvReaderException {
+    @ParameterizedTest
+    @ValueSource(booleans =  {false, true})
+    public void unicodeColumnHeaders(boolean useUtf32CountingConvention) throws CsvReaderException {
+        // In the UTF-32 counting convention, this is a column of width 4 (three Unicode characters plus the space)
+        // followed by a column of width 5. The first cell of the data would therefore be "abc", and the next cell
+        // would be "def".
+
+        // In the UTF-16 counting convention, this is a column of width 7 (six UTF-16 units plus the space)
+        // followed by a column of width 5. The first cell of the data would therefore be "abc def" and the next
+        // cell woult be "gh".
         final String input =
                 ""
-                        + "NAME                     STATUS       AGE      LABELS\n"
-                        + "argo-events              Not Active   2y77d    app.kubernetes.io/instance=argo-events,kubernetes.io/metadata.name=argo-events\n"
-                        + "argo-workflows           Active       2y77d    app.kubernetes.io/instance=argo-workflows,kubernetes.io/metadata.name=argo-workflows\n"
-                        + "argocd                   Active       5y18d    kubernetes.io/metadata.name=argocd\n"
-                        + "beta                     Not Active   4y235d   kubernetes.io/metadata.name=beta\n";
+                        + "🥰😻🧡 ╔═╤═╗\n"
+                        + "abc defgh\n";
+
+        final ColumnSet expected;
+
+        if (useUtf32CountingConvention) {
+            expected = ColumnSet.of(
+                    Column.ofRefs("🥰😻🧡", "╔═╤═╗", "Z"),
+                    Column.ofRefs("Type", "Dividend", "Dividend"));
+        } else {
+            expected = ColumnSet.of(
+                    Column.ofRefs("🥰😻🧡", "╔═╤═╗", "Z"),
+                    Column.ofRefs("Type", "💓💕💖Dividend", "Dividend"));
+        }
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
-                .ignoreSurroundingSpaces(true).build();
-
-        final ColumnSet expected = ColumnSet.of(
-                Column.ofRefs("NAME", "argo-events", "argo-workflows", "argocd", "beta"),
-                Column.ofRefs("STATUS", "Not Active", "Active", "Active", "Not Active"),
-                Column.ofRefs("AGE", "2y77d", "2y77d", "5y18d", "4y235d"),
-                Column.ofRefs("LABELS", "app.kubernetes.io/instance=argo-events,kubernetes.io/metadata.name=argo-events",
-                        "app.kubernetes.io/instance=argo-workflows,kubernetes.io/metadata.name=argo-workflows",
-                        "kubernetes.io/metadata.name=argocd",
-                        "kubernetes.io/metadata.name=beta"));
+                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
 
         invokeTest(specs, input, expected);
     }
+
 
     private static final class RepeatingInputStream extends InputStream {
         private byte[] data;
