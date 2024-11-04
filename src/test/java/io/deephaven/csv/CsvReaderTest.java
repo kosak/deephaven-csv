@@ -2077,26 +2077,22 @@ public class CsvReaderTest {
     }
 
     /**
-     * The library should refuse to split surrogate pairs.
      * If the library is configured for the UTF-16 counting convention, and there is only one unit of space left
      * in the field, and the next character is a character outside the Basic Multilingual Plane that requires two units,
-     * the library will throw an exception.
+     * the library will include that character in the next field rather than this one.
      */
     @ParameterizedTest
     @ValueSource(booleans =  {false, true})
     public void brokenSurrogatePair(boolean useUtf32CountingConvention) throws CsvReaderException {
-        // This test has a column of width 3 (three Unicode characters plus the space)
+        // This test has a column of width 3 (three characters plus the space)
         // followed by a column of width 2.
         //
-        // The UTF-32 counting convention poses no problems.
-
-
-        // In the UTF-32 counting convention, this is a column of width 3 (three Unicode characters plus the space)
-        // followed by a column of width 2. There is no problem in this convention.
-
-        // In the UTF-16 counting convention, this is a column of width 7 (six UTF-16 units plus the space)
-        // followed by a column of width 5. The first cell of the data would therefore be "abc def" and the next
-        // cell woult be "gh".
+        // In the UTF-32 counting convention, the first column will get "🥰😻 " and the second column will
+        // get "🧡💓". We turn off ignoreSurroundingSpaces to highlight how this is counted.
+        //
+        // In the UTF-16 counting convention, the first column will get 🥰 (because 🥰😻 uses characters
+        // outside the Basic Multilingual Plane and takes four units to represent, but the first field
+        // only has space for three). The next column will get "😻 🧡💓" (the rest of the row).
         final String input =
                 ""
                         + "C1 C2\n"
@@ -2106,16 +2102,16 @@ public class CsvReaderTest {
 
         if (useUtf32CountingConvention) {
             expected = ColumnSet.of(
-                    Column.ofRefs("🥰😻🧡", "abc"),
-                    Column.ofRefs("╔═╤═╗", "defgh"));
+                    Column.ofRefs("C1", "🥰😻 "),
+                    Column.ofRefs("C2", "🧡💓"));
         } else {
             expected = ColumnSet.of(
-                    Column.ofRefs("🥰😻🧡", "abc def"),
-                    Column.ofRefs("╔═╤═╗", "gh"));
+                    Column.ofRefs("C1", "🥰"),
+                    Column.ofRefs("C2", "😻 🧡💓"));
         }
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
-                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+                .ignoreSurroundingSpaces(false).useUtf32CountingConvention(useUtf32CountingConvention).build();
 
         invokeTest(specs, input, expected);
     }

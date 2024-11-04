@@ -90,18 +90,14 @@ public class FixedCellGrabber implements CellGrabber {
             }
             final int utf8Length = ReaderUtil.getUtf8LengthAndCharLength(data[current], src.end() - current,
                     utf32CountingMode, tempInt);
-            numCharsToTake -= tempInt.intValue();
-            if (numCharsToTake < 0) {
-                final String lastChar = new String(data, current, utf8Length);
-                final String message = String.format(
-                        " There is not enough space left in the field to store this character. "
-                                + " CsvSpecs has been configured to count in units of UTF-16 units. "
-                                + "The character '%s' lies outside Unicode's Basic Multilingual Plane "
-                                + "and therefore takes two units to encode. This field only has one unit left in its budget. "
-                                + "and the library cannot 'split' the character. To remedy this, it may be possible to widen "
-                                + "the input column or to set CsvSpecs.useUtf32CountingConvention", lastChar);
-                throw new IllegalArgumentException(message);
+            if (numCharsToTake < tempInt.intValue()) {
+                // There is not enough space left in the field to store this character.
+                // This can happen if CsvSpecs is set for the UTF16 counting convention,
+                // there is one unit left in the field, and we encounter a character outside
+                // the Basic Multilingual Plane, which would require two units.
+                break;
             }
+            numCharsToTake -= tempInt.intValue();
             current += utf8Length;
             if (current > src.end()) {
                 throw new RuntimeException("Data error: partial UTF-8 sequence found in input");
