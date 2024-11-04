@@ -4,6 +4,7 @@ import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.reading.ReaderUtil;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableBoolean;
+import io.deephaven.csv.util.MutableInt;
 
 import java.io.InputStream;
 
@@ -31,7 +32,8 @@ public class FixedCellGrabber implements CellGrabber {
     private final ByteSlice rowText;
     private boolean needsUnderlyingRefresh;
     private int colIndex;
-    private final MutableBoolean dummy;
+    private final MutableBoolean dummy1;
+    private final MutableInt dummy2;
 
     /** Constructor. */
     public FixedCellGrabber(final CellGrabber lineGrabber, final int[] columnWidths, boolean ignoreSurroundingSpaces,
@@ -43,14 +45,15 @@ public class FixedCellGrabber implements CellGrabber {
         this.rowText = new ByteSlice();
         this.needsUnderlyingRefresh = true;
         this.colIndex = 0;
-        this.dummy = new MutableBoolean();
+        this.dummy1 = new MutableBoolean();
+        this.dummy2 = new MutableInt();
     }
 
     @Override
     public void grabNext(ByteSlice dest, MutableBoolean lastInRow, MutableBoolean endOfInput) throws CsvReaderException {
         if (needsUnderlyingRefresh) {
             // Underlying row used up, and all columns provided. Ask underlying CellGrabber for the next line.
-            lineGrabber.grabNext(rowText, dummy, endOfInput);
+            lineGrabber.grabNext(rowText, dummy1, endOfInput);
 
             if (endOfInput.booleanValue()) {
                 // Set dest to the empty string, and leave 'endOfInput' set to true.
@@ -65,7 +68,7 @@ public class FixedCellGrabber implements CellGrabber {
         // There is data to return. Count off N characters. The final column gets all remaining characters.
         final boolean lastCol  = colIndex == columnWidths.length - 1;
         final int numCharsToTake = lastCol ? Integer.MAX_VALUE : columnWidths[colIndex];
-        takeNCharactersInCharset(rowText, dest, numCharsToTake, utf32CountingMode);
+        takeNCharactersInCharset(rowText, dest, numCharsToTake, utf32CountingMode, dummy2);
         ++colIndex;
         needsUnderlyingRefresh = lastCol || dest.size() == 0;
         lastInRow.setValue(needsUnderlyingRefresh);
@@ -77,7 +80,7 @@ public class FixedCellGrabber implements CellGrabber {
     }
 
     private static void takeNCharactersInCharset(ByteSlice src, ByteSlice dest, int numCharsToTake,
-                                                 boolean utf32CountingMode) {
+                                                 boolean utf32CountingMode, MutableInt tempInt) {
         final byte[] data = src.data();
         final int cellBegin = src.begin();
         int current = cellBegin;
@@ -85,14 +88,19 @@ public class FixedCellGrabber implements CellGrabber {
             if (current == src.end()) {
                 break;
             }
-            final int utf8Length = ReaderUtil.getUtf8Length(data[current]);
-            final int charsConsumed = utf32CountingMode || utf8Length < 4 ? 1 : 2;
-            numCharsToTake -= charsConsumed;
+            final int utf8Length = ReaderUtil.getUtf8LengthAndCharLength(data[current], src.end() - current,
+                    utf32CountingMode, tempInt);
+            numCharsToTake -= tempInt.intValue();
             if (numCharsToTake < 0) {
-                throw new RuntimeException(
-                        "While in UTF16 character counting mode, encountered a Unicode character outside the " +
-                        "Basic Multilingual Plane. This requires two Java chars to represent, but the fixed field " +
-                        "only has remainig space for one.");
+                final String lastChar = new String(data, current, utf8Length);
+                final String message = String.format(
+                        " There is not enough space left in the field to store this character. "
+                                + " CsvSpecs has been configured to count in units of UTF-16 units. "
+                                + "The character '%s' lies outside Unicode's Basic Multilingual Plane "
+                                + "and therefore takes two units to encode. This field only has one unit left in its budget. "
+                                + "and the library cannot 'split' the character. To remedy this, it may be possible to widen "
+                                + "the input column or to set CsvSpecs.useUtf32CountingConvention", lastChar);
+                throw new IllegalArgumentException(message);
             }
             current += utf8Length;
             if (current > src.end()) {

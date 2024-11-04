@@ -2076,7 +2076,50 @@ public class CsvReaderTest {
         invokeTest(specs, input, expected);
     }
 
-    // do the test where you break up a surrogate pair
+    /**
+     * The library should refuse to split surrogate pairs.
+     * If the library is configured for the UTF-16 counting convention, and there is only one unit of space left
+     * in the field, and the next character is a character outside the Basic Multilingual Plane that requires two units,
+     * the library will throw an exception.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans =  {false, true})
+    public void brokenSurrogatePair(boolean useUtf32CountingConvention) throws CsvReaderException {
+        // This test has a column of width 3 (three Unicode characters plus the space)
+        // followed by a column of width 2.
+        //
+        // The UTF-32 counting convention poses no problems.
+
+
+        // In the UTF-32 counting convention, this is a column of width 3 (three Unicode characters plus the space)
+        // followed by a column of width 2. There is no problem in this convention.
+
+        // In the UTF-16 counting convention, this is a column of width 7 (six UTF-16 units plus the space)
+        // followed by a column of width 5. The first cell of the data would therefore be "abc def" and the next
+        // cell woult be "gh".
+        final String input =
+                ""
+                        + "C1 C2\n"
+                        + "🥰😻 🧡💓\n";
+
+        final ColumnSet expected;
+
+        if (useUtf32CountingConvention) {
+            expected = ColumnSet.of(
+                    Column.ofRefs("🥰😻🧡", "abc"),
+                    Column.ofRefs("╔═╤═╗", "defgh"));
+        } else {
+            expected = ColumnSet.of(
+                    Column.ofRefs("🥰😻🧡", "abc def"),
+                    Column.ofRefs("╔═╤═╗", "gh"));
+        }
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true).delimiter(' ')
+                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+
+        invokeTest(specs, input, expected);
+    }
+
 
 
     private static final class RepeatingInputStream extends InputStream {

@@ -31,12 +31,26 @@ public class ReaderUtil {
         cs.reset(data, begin, end);
     }
 
+    public static int getUtf8LengthAndCharLength(
+            byte firstByte, int numBytes,
+            boolean useUtf32CountingConvention, MutableInt charCountResult) {
+        final int utf8Length = getUtf8Length(firstByte);
+        if (utf8Length > numBytes) {
+            throw new RuntimeException(String.format(
+                    "The next UTF-8 character needs %d bytes but there are only %d left in the field",
+                    utf8Length, numBytes));
+        }
+        final int numChars = useUtf32CountingConvention || utf8Length < 4 ? 1 : 2;
+        charCountResult.setValue(numChars);
+        return utf8Length;
+    }
+
     /**
      * Calculate the expected length of a UTF-8 sequence, given its first byte.
      * @param firstByte The first byte of the sequence.
      * @return The length of the sequence, in the range 1..4 inclusive.
      */
-    public static int getUtf8Length(byte firstByte) {
+    private static int getUtf8Length(byte firstByte) {
         if ((firstByte & 0x80) == 0) {
             // 0xxxxxxx
             // 1-byte UTF-8 character aka ASCII.
@@ -63,13 +77,5 @@ public class ReaderUtil {
         }
         throw new IllegalStateException(String.format("0x%x is not a valid starting byte for a UTF-8 sequence",
                 firstByte));
-    }
-
-    public static int getUtf8LengthAndCharLength(byte firstByte, boolean useUtf32CountingConvention,
-                                                 MutableInt charCountResult) {
-        final int utf8Length = getUtf8Length(firstByte);
-        final int numChars = useUtf32CountingConvention || utf8Length < 4 ? 1 : 2;
-        charCountResult.setValue(numChars);
-        return utf8Length;
     }
 }
