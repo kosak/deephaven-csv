@@ -1949,6 +1949,41 @@ public class CsvReaderTest {
     }
 
     /**
+     * Fixed-width cells can keep their padding characters or trim them, via CsvSpecs#ignoreSurroundingSpaces
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void fixedColumnsMayIncludeOrExcludeSurroundingSpaces(boolean ignoreSurroundingSpaces) throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOG  Dividend 0.25    200\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "Z     Coupon   0.18    500\n";
+
+        final String[] symData = ignoreSurroundingSpaces ?
+                new String[] { "GOOG", "T", "Z" } :
+                new String[] { "GOOG  ", "T     ", "Z     " };
+
+        final String[] typeData = ignoreSurroundingSpaces ?
+                new String[] { "Dividend", "Dividend", "Coupon" } :
+                new String[] { "Dividend ", "Dividend ", "Coupon   " };
+
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", symData),
+                        Column.ofRefs("Type", typeData),
+                        Column.ofValues("Price", 0.25, 0.15, 0.18),
+                        Column.ofValues("SecurityId", 200, 300, 500));
+
+        final CsvSpecs specs =
+                defaultCsvBuilder().hasFixedWidthColumns(true).ignoreSurroundingSpaces(ignoreSurroundingSpaces).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
      * Like delimited mode, fixed-width mode allows rows to be short.
      */
     @ParameterizedTest
