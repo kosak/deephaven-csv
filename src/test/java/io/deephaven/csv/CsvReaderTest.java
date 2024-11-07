@@ -1900,6 +1900,9 @@ public class CsvReaderTest {
         invokeTest(specs, input, expected);
     }
 
+    /**
+     * A basic test of fixed-width column support.
+     */
     @Test
     public void simpleFixedColumnWidths() throws CsvReaderException {
         final String input =
@@ -1917,15 +1920,13 @@ public class CsvReaderTest {
                         Column.ofValues("SecurityId", 200, 300, 500));
 
         final CsvSpecs specs =
-                defaultCsvBuilder().hasFixedWidthColumns(true).ignoreSurroundingSpaces(true).build();
+                defaultCsvBuilder().hasFixedWidthColumns(true).build();
 
         invokeTest(specs, input, expected);
     }
 
     /**
-     * We allow data fields to fill the whole cell, without a padding character
-     * 
-     * @throws CsvReaderException
+     * We allow fixed-width data fields to fill the whole cell, without a padding character.
      */
     @Test
     public void fixedColumnWidthsFullCell() throws CsvReaderException {
@@ -1943,12 +1944,12 @@ public class CsvReaderTest {
                         Column.ofValues("SecurityId", 200, 300));
 
         final CsvSpecs specs =
-                defaultCsvBuilder().hasFixedWidthColumns(true).ignoreSurroundingSpaces(true).build();
+                defaultCsvBuilder().hasFixedWidthColumns(true).build();
         invokeTest(specs, input, expected);
     }
 
     /**
-     * As usual, we allow rows to be short
+     * Like delimited mode, fixed-width mode allows rows to be short.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -1969,7 +1970,7 @@ public class CsvReaderTest {
                         Column.ofValues("SecurityId", Sentinels.NULL_INT, 300, 500, Sentinels.NULL_INT));
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true)
-                .ignoreSurroundingSpaces(true).allowMissingColumns(allowMissingColumns).build();
+                .allowMissingColumns(allowMissingColumns).build();
 
         if (allowMissingColumns) {
             invokeTest(specs, input, expected);
@@ -1980,7 +1981,7 @@ public class CsvReaderTest {
     }
 
     /**
-     * If there is no header row, the caller needs to specify column widths.
+     * In fixed width mode, if there is no header row, the caller needs to specify column widths.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2012,8 +2013,8 @@ public class CsvReaderTest {
     }
 
     /**
-     * If there is no header row, the caller may specify column names. Otherwise synthetic column names will be
-     * generated.
+     * In fixed width mode (as is also true in delimited mode), if there is no header row, the caller may specify column names.
+     * If they don't, synthetic column names will be generated.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2035,7 +2036,7 @@ public class CsvReaderTest {
                         Column.ofValues(expectedColumnNames[3], 200, 300, 500));
 
         CsvSpecs.Builder specsBuilder = defaultCsvBuilder().hasFixedWidthColumns(true).hasHeaderRow(false)
-                .ignoreSurroundingSpaces(true).fixedColumnWidths(Arrays.asList(6, 9, 8, 3));
+                .fixedColumnWidths(Arrays.asList(6, 9, 8, 3));
 
         if (specifyColumnNames) {
             specsBuilder = specsBuilder.headers(Arrays.asList(expectedColumnNames));
@@ -2045,8 +2046,9 @@ public class CsvReaderTest {
     }
 
     /**
-     * All six Unicode characters ♡♥❥❦◑╳ are in the Basic Multilingual Plane and can all be represented with a single
-     * Java char. Therefore, they are counted the same with both counting conventions.
+     * A counting convention test relevant to fixed-width mode. All six Unicode characters ♡♥❥❦◑╳ are in the Basic
+     * Multilingual Plane and can all be represented with a single Java char. Therefore, they are counted the same with
+     * both counting conventions.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2065,14 +2067,15 @@ public class CsvReaderTest {
                         Column.ofValues("SecurityId", 300, 500));
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true)
-                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+                .useUtf32CountingConvention(useUtf32CountingConvention).build();
 
         invokeTest(specs, input, expected);
     }
 
     /**
-     * All six Unicode characters 🥰😻🧡💓💕💖 are _outside_ the Basic Multilingual Plane and all are represented with
-     * two Java chars. The Sym column has a width of six. They will fit in the "Sym" column if the caller uses UTF-32
+     * A counting convention test relevant to fixed-width mode. All six Unicode characters 🥰😻🧡💓💕💖 are _outside_
+     * the Basic Multilingual Plane and all are represented with two Java chars. The Sym column has a width of six.
+     * They will fit in the "Sym" column if the caller uses the UTF-32
      * counting convention. They will not fit in the column if the caller uses the UTF-16 counting convention (because
      * it takes 12 Java chars to express them).
      */
@@ -2098,18 +2101,16 @@ public class CsvReaderTest {
         }
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true)
-                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+                .useUtf32CountingConvention(useUtf32CountingConvention).build();
 
         invokeTest(specs, input, expected);
     }
 
     /**
-     * Using Unicode characters as column headers. We give one column a header with characters from the BMP and one with
-     * characters outside the BMP and show how the behavior differs depending on the useUtf32CountingConvention flag.
-     * ╔═╗ All six Unicode characters 🥰😻🧡💓💕💖 are _outside_ the Basic Multilingual Plane and all are represented
-     * with two Java chars. The Sym column has a width of six. They will fit in the "Sym" column if the caller uses
-     * UTF-32 counting convention. They will not fit in the column if the caller uses the UTF-16 counting convention
-     * (because it takes 12 Java chars to express them).
+     * Using Unicode characters as column headers in fixed-width mode. We give one column a header with characters from outside the BMP, and one with
+     * characters inside the BMP and show how the behavior differs depending on the useUtf32CountingConvention flag.
+     * The header 🥰😻🧡 plus trailing space will be counted as width 4 in the UTF-32 counting convention, but
+     * width 7 in the UTF-16 column convention. Meanwhile, the header ╔═╤═╗ is counted as width 5 in both conventions.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2139,13 +2140,13 @@ public class CsvReaderTest {
         }
 
         final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true)
-                .ignoreSurroundingSpaces(true).useUtf32CountingConvention(useUtf32CountingConvention).build();
+                .useUtf32CountingConvention(useUtf32CountingConvention).build();
 
         invokeTest(specs, input, expected);
     }
 
     /**
-     * If the library is configured for the UTF-16 counting convention, and there is only one unit of space left in the
+     * In fixed-width mode, if the library is configured for the UTF-16 counting convention, and there is only one unit of space left in the
      * field, and the next character is a character outside the Basic Multilingual Plane that requires two units, the
      * library will include that character in the next field rather than this one.
      */
