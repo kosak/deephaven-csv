@@ -252,6 +252,9 @@ public abstract class CsvSpecs {
         if (!hasHeaderRow() && skipHeaderRows() > 0) {
             problems.add("skipHeaderRows != 0 but hasHeaderRow is not set");
         }
+        if (fixedColumnWidths().size() != 0 && !hasFixedWidthColumns()) {
+            problems.add("fixedColumnWidths is non-empty but hasFixedWidthColumns is not set");
+        }
         if (problems.isEmpty()) {
             return;
         }

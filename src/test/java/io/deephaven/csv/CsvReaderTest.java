@@ -2013,6 +2013,16 @@ public class CsvReaderTest {
     }
 
     /**
+     * Column widths are not meaningful outside fixed width mode
+     */
+    @Test
+    public void columnWidthsOnlyInFixedWidthMode() {
+        Assertions.assertThatThrownBy(() ->
+                defaultCsvBuilder().hasFixedWidthColumns(false).fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()
+                ).hasMessage("CsvSpecs failed validation for the following reasons: fixedColumnWidths is non-empty but hasFixedWidthColumns is not set");
+    }
+
+    /**
      * In fixed width mode (as is also true in delimited mode), if there is no header row, the caller may specify column names.
      * If they don't, synthetic column names will be generated.
      */
