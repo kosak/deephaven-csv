@@ -2131,6 +2131,33 @@ public class CsvReaderTest {
     }
 
     /**
+     * Because the library is tolerant of the last cell being shorter or wider than expected,
+     * the final entry in fixedColumnWidths is just a placeholder.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 5000, 34_000_000})
+    public void finalFixedColumnWidthEntryIsPlaceholder(int finalEntry) throws CsvReaderException {
+        final String input =
+                ""
+                        + "GOOG  Dividend 0.25    200\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "Z     Coupon   0.18    500\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Column1", "GOOG", "T", "Z"),
+                        Column.ofRefs("Column2", "Dividend", "Dividend", "Coupon"),
+                        Column.ofValues("Column3", 0.25, 0.15, 0.18),
+                        Column.ofValues("Column4", 200, 300, 500));
+
+        final CsvSpecs.Builder specsBase = defaultCsvBuilder().hasFixedWidthColumns(true).hasHeaderRow(false)
+                .ignoreSurroundingSpaces(true);
+
+        final CsvSpecs specs = specsBase.fixedColumnWidths(Arrays.asList(6, 9, 8, finalEntry)).build();
+        invokeTest(specs, input, expected);
+    }
+
+    /**
      * Test all the parameters incompatible with delimited mode, all at the same time.
      */
     @Test
@@ -2158,6 +2185,20 @@ public class CsvReaderTest {
 
         Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(true)
                 .quote('X').delimiter('Y').trim(true).build()).hasMessage(expectedMessage);
+    }
+
+
+    /**
+     * Test all the parameters incompatible with fixed-width mode, all at the same time.
+     */
+    @Test
+    public void validateFixedWidthModeParameters() {
+        final String expectedMessage =
+                "CsvSpecs failed validation for the following reasons: " +
+                        "Fixed column width -5 is invalid";
+
+        Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(true).fixedColumnWidths(Arrays.asList(-5, 3, 8))
+                .build()).hasMessage(expectedMessage);
     }
 
     /**

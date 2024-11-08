@@ -257,6 +257,12 @@ public abstract class CsvSpecs {
             problems.add("skipHeaderRows != 0 but hasHeaderRow is not set");
         }
 
+        for (final Integer colWidth : fixedColumnWidths()) {
+            if (colWidth < 1) {
+                problems.add(String.format("Fixed column width %d is invalid", colWidth));
+            }
+        }
+
         // Certain items must not be set in fixed-width column mode. Other items must not be set in delimited column
         // mode.
         if (hasFixedWidthColumns()) {
