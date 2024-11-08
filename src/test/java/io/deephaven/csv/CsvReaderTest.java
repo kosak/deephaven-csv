@@ -2052,6 +2052,7 @@ public class CsvReaderTest {
                         + "Z     Dividend 0.18    500\n"
                         + "QQQ   Coupon\n";
 
+
         final ColumnSet expected =
                 ColumnSet.of(
                         Column.ofRefs("Sym", "GOOG", "T", "Z", "QQQ"),
@@ -2068,6 +2069,34 @@ public class CsvReaderTest {
             Assertions.assertThatThrownBy(() -> invokeTest(specs, input, expected))
                     .hasRootCauseMessage("Row 2 has too few columns (expected 4)");
         }
+    }
+
+    /**
+     * Like delimited mode, fixed-width mode allows skipping empty lines
+     */
+    @Test
+    public void fixedColumnWidthsSkipEmptyLines() throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOG  Dividend 0.25    200\n"
+                        + "\n"
+                        + "\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "\n"
+                        + "Z     Dividend 0.18    500\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", "GOOG", "T", "Z"),
+                        Column.ofRefs("Type", "Dividend", "Dividend", "Dividend"),
+                        Column.ofValues("Price", 0.25, 0.15, 0.18),
+                        Column.ofValues("SecurityId", 200, 300, 500));
+
+        final CsvSpecs specs = defaultCsvBuilder().hasFixedWidthColumns(true)
+                .ignoreEmptyLines(true).build();
+
+        invokeTest(specs, input, expected);
     }
 
     /**

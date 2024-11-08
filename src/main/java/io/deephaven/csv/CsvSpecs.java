@@ -128,7 +128,7 @@ public abstract class CsvSpecs {
          * If the caller wants to specify them explicitly, they can use this method. It is an error to set this
          * parameter if {@link #hasFixedWidthColumns} is false. Note that because the library is tolerant of the last
          * cell being shorter or wider than expected, the value specified here for the width of the last column is
-         * simply a placeholder; its value is ignored.
+         * simply a placeholder; its value is ignored.  It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder fixedColumnWidths(Iterable<Integer> fixedColumnWidths);
 
@@ -256,8 +256,30 @@ public abstract class CsvSpecs {
         if (!hasHeaderRow() && skipHeaderRows() > 0) {
             problems.add("skipHeaderRows != 0 but hasHeaderRow is not set");
         }
-        if (fixedColumnWidths().size() != 0 && !hasFixedWidthColumns()) {
-            problems.add("fixedColumnWidths is non-empty but hasFixedWidthColumns is not set");
+
+        // Certain items must not be set in fixed-width column mode. Other items must not be set in delimited column mode.
+        if (hasFixedWidthColumns()) {
+            final String format = "Incompatible parameters: can't set %s when hasFixedWidthColumns is true";
+            if (quote() != defaultQuote) {
+                problems.add(String.format(format, "quote"));
+            }
+
+            if (delimiter() != defaultDelimiter) {
+                problems.add(String.format(format, "delimiter"));
+            }
+
+            if (trim() != defaultTrim) {
+                problems.add(String.format(format, "trim"));
+            }
+        } else {
+            final String format = "Incompatible parameters: can't set %s when hasFixedWidthColumns is false";
+            if (fixedColumnWidths().size() != 0) {
+                problems.add(String.format(format, "fixedColumnWidths"));
+            }
+
+            if (useUtf32CountingConvention() != defaultUtf32CountingConvention) {
+                problems.add(String.format(format, "useUtf32CountingConvention"));
+            }
         }
         if (problems.isEmpty()) {
             return;
@@ -391,12 +413,14 @@ public abstract class CsvSpecs {
         return Collections.emptyList();
     }
 
+    private static final boolean defaultUtf32CountingConvention = true;
+
     /**
      * See {@link Builder#useUtf32CountingConvention}.
      */
     @Default
     public boolean useUtf32CountingConvention() {
-        return true;
+        return defaultUtf32CountingConvention;
     }
 
     /**
@@ -455,20 +479,25 @@ public abstract class CsvSpecs {
         return 0;
     }
 
+    private final char defaultDelimiter = ',';
+
     /**
      * See {@link Builder#delimiter}.
      */
     @Default
     public char delimiter() {
-        return ',';
+        return defaultDelimiter;
     }
+
+
+    private static final char defaultQuote = '"';
 
     /**
      * See {@link Builder#quote}.
      */
     @Default
     public char quote() {
-        return '"';
+        return defaultQuote;
     }
 
     /**
@@ -479,12 +508,14 @@ public abstract class CsvSpecs {
         return true;
     }
 
+    private static boolean defaultTrim = false;
+
     /**
      * See {@link Builder#trim}.
      */
     @Default
     public boolean trim() {
-        return false;
+        return defaultTrim;
     }
 
     /**
