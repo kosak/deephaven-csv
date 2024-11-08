@@ -2132,13 +2132,29 @@ public class CsvReaderTest {
     }
 
     /**
-     * Column widths are not meaningful outside fixed width mode
+     * Test all the parameters incompatible with delimited mode, all at the same time.
      */
     @Test
-    public void columnWidthsOnlyInFixedWidthMode() {
+    public void checkParametersIncompatibleWithDelimitedMode() {
         Assertions.assertThatThrownBy(() ->
-                defaultCsvBuilder().hasFixedWidthColumns(false).fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()
-                ).hasMessage("CsvSpecs failed validation for the following reasons: fixedColumnWidths is non-empty but hasFixedWidthColumns is not set");
+                defaultCsvBuilder().hasFixedWidthColumns(false)
+                        .useUtf32CountingConvention(false)
+                        .fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()
+        ).hasMessage("CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set fixedColumnWidths when hasFixedWidthColumns is false, Incompatible parameters: can't set useUtf32CountingConvention when hasFixedWidthColumns is false");
+    }
+
+    /**
+     * Test all the parameters incompatible with fixed-width mode, all at the same time.
+     */
+    @Test
+    public void checkParametersIncompatibleWithFixedWidthMode() {
+        Assertions.assertThatThrownBy(() ->
+                defaultCsvBuilder().hasFixedWidthColumns(true)
+                        .quote('X')
+                        .delimiter('Y')
+                        .trim(true)
+                        .build()
+        ).hasMessage("CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set quote when hasFixedWidthColumns is true, Incompatible parameters: can't set delimiter when hasFixedWidthColumns is true, Incompatible parameters: can't set trim when hasFixedWidthColumns is true")        ;
     }
 
     /**
