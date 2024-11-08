@@ -1949,7 +1949,8 @@ public class CsvReaderTest {
     }
 
     /**
-     * Fixed-width cells can keep their padding characters or trim them, via CsvSpecs#ignoreSurroundingSpaces
+     * Fixed-width cells can keep their padding characters or trim them, via {@link CsvSpecs#ignoreSurroundingSpaces}
+     * Note that column headers themselves are always trimmed.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})

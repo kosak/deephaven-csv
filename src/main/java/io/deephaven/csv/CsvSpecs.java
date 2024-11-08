@@ -125,8 +125,9 @@ public abstract class CsvSpecs {
         /**
          * When {@link #hasFixedWidthColumns} is set, the library either determines the column widths from the header
          * row (provided {@link #hasHeaderRow} is set), or the column widths can be specified explictly by the caller.
-         * If the caller wants to specify them explicitly, they can use this method.
-         * 
+         * If the caller wants to specify them explicitly, they can use this method. It is an error to set this
+         * parameter if {@link #hasFixedWidthColumns} is false.
+         *
          * @param fixedColumnWidths The caller-specified widths of the columns.
          */
         Builder fixedColumnWidths(Iterable<Integer> fixedColumnWidths);
@@ -138,7 +139,6 @@ public abstract class CsvSpecs {
          * example, the Unicode code point 💔 (U+1F494) is one Unicode code point, but takes two Java chars to
          * represent. Along these lines, the string 💔💔💔 would fit in a column of width 3 when utf32CountingMode is
          * true, but would require a column width of at least 6 when utf32CountingMode is false.
-         *
          * The default setting of true is arguably more natural for users (the number of characters they see matches the
          * visual width of the column). But some programs may want the value of false because they are counting Java
          * chars.
