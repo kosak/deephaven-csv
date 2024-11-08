@@ -1954,7 +1954,8 @@ public class CsvReaderTest {
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    public void fixedColumnsMayIncludeOrExcludeSurroundingSpaces(boolean ignoreSurroundingSpaces) throws CsvReaderException {
+    public void fixedColumnsMayIncludeOrExcludeSurroundingSpaces(boolean ignoreSurroundingSpaces)
+            throws CsvReaderException {
         final String input =
                 ""
                         + "Sym   Type     Price   SecurityId\n"
@@ -1962,13 +1963,11 @@ public class CsvReaderTest {
                         + "T     Dividend 0.15    300\n"
                         + "Z     Coupon   0.18    500\n";
 
-        final String[] symData = ignoreSurroundingSpaces ?
-                new String[] { "GOOG", "T", "Z" } :
-                new String[] { "GOOG  ", "T     ", "Z     " };
+        final String[] symData =
+                ignoreSurroundingSpaces ? new String[] {"GOOG", "T", "Z"} : new String[] {"GOOG  ", "T     ", "Z     "};
 
-        final String[] typeData = ignoreSurroundingSpaces ?
-                new String[] { "Dividend", "Dividend", "Coupon" } :
-                new String[] { "Dividend ", "Dividend ", "Coupon   " };
+        final String[] typeData = ignoreSurroundingSpaces ? new String[] {"Dividend", "Dividend", "Coupon"}
+                : new String[] {"Dividend ", "Dividend ", "Coupon   "};
 
 
         final ColumnSet expected =
@@ -1992,7 +1991,7 @@ public class CsvReaderTest {
         final String input =
                 ""
                         + "front matter\n"
-        + "ignore me\n"
+                        + "ignore me\n"
                         + "Sym   Type     Price   SecurityId\n"
                         + "GOOG  Dividend 0.25    200\n"
                         + "T     Dividend 0.15    300\n"
@@ -2136,11 +2135,10 @@ public class CsvReaderTest {
      */
     @Test
     public void checkParametersIncompatibleWithDelimitedMode() {
-        Assertions.assertThatThrownBy(() ->
-                defaultCsvBuilder().hasFixedWidthColumns(false)
-                        .useUtf32CountingConvention(false)
-                        .fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()
-        ).hasMessage("CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set fixedColumnWidths when hasFixedWidthColumns is false, Incompatible parameters: can't set useUtf32CountingConvention when hasFixedWidthColumns is false");
+        Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(false)
+                .useUtf32CountingConvention(false)
+                .fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()).hasMessage(
+                        "CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set fixedColumnWidths when hasFixedWidthColumns is false, Incompatible parameters: can't set useUtf32CountingConvention when hasFixedWidthColumns is false");
     }
 
     /**
@@ -2148,18 +2146,17 @@ public class CsvReaderTest {
      */
     @Test
     public void checkParametersIncompatibleWithFixedWidthMode() {
-        Assertions.assertThatThrownBy(() ->
-                defaultCsvBuilder().hasFixedWidthColumns(true)
-                        .quote('X')
-                        .delimiter('Y')
-                        .trim(true)
-                        .build()
-        ).hasMessage("CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set quote when hasFixedWidthColumns is true, Incompatible parameters: can't set delimiter when hasFixedWidthColumns is true, Incompatible parameters: can't set trim when hasFixedWidthColumns is true")        ;
+        Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(true)
+                .quote('X')
+                .delimiter('Y')
+                .trim(true)
+                .build()).hasMessage(
+                        "CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set quote when hasFixedWidthColumns is true, Incompatible parameters: can't set delimiter when hasFixedWidthColumns is true, Incompatible parameters: can't set trim when hasFixedWidthColumns is true");
     }
 
     /**
-     * In fixed width mode (as is also true in delimited mode), if there is no header row, the caller may specify column names.
-     * If they don't, synthetic column names will be generated.
+     * In fixed width mode (as is also true in delimited mode), if there is no header row, the caller may specify column
+     * names. If they don't, synthetic column names will be generated.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2219,10 +2216,9 @@ public class CsvReaderTest {
 
     /**
      * A counting convention test relevant to fixed-width mode. All six Unicode characters 🥰😻🧡💓💕💖 are _outside_
-     * the Basic Multilingual Plane and all are represented with two Java chars. The Sym column has a width of six.
-     * They will fit in the "Sym" column if the caller uses the UTF-32
-     * counting convention. They will not fit in the column if the caller uses the UTF-16 counting convention (because
-     * it takes 12 Java chars to express them).
+     * the Basic Multilingual Plane and all are represented with two Java chars. The Sym column has a width of six. They
+     * will fit in the "Sym" column if the caller uses the UTF-32 counting convention. They will not fit in the column
+     * if the caller uses the UTF-16 counting convention (because it takes 12 Java chars to express them).
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2252,10 +2248,11 @@ public class CsvReaderTest {
     }
 
     /**
-     * Using Unicode characters as column headers in fixed-width mode. We give one column a header with characters from outside the BMP, and one with
-     * characters inside the BMP and show how the behavior differs depending on the useUtf32CountingConvention flag.
-     * The header 🥰😻🧡 plus trailing space will be counted as width 4 in the UTF-32 counting convention, but
-     * width 7 in the UTF-16 column convention. Meanwhile, the header ╔═╤═╗ is counted as width 5 in both conventions.
+     * Using Unicode characters as column headers in fixed-width mode. We give one column a header with characters from
+     * outside the BMP, and one with characters inside the BMP and show how the behavior differs depending on the
+     * useUtf32CountingConvention flag. The header 🥰😻🧡 plus trailing space will be counted as width 4 in the UTF-32
+     * counting convention, but width 7 in the UTF-16 column convention. Meanwhile, the header ╔═╤═╗ is counted as width
+     * 5 in both conventions.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -2291,9 +2288,9 @@ public class CsvReaderTest {
     }
 
     /**
-     * In fixed-width mode, if the library is configured for the UTF-16 counting convention, and there is only one unit of space left in the
-     * field, and the next character is a character outside the Basic Multilingual Plane that requires two units, the
-     * library will include that character in the next field rather than this one.
+     * In fixed-width mode, if the library is configured for the UTF-16 counting convention, and there is only one unit
+     * of space left in the field, and the next character is a character outside the Basic Multilingual Plane that
+     * requires two units, the library will include that character in the next field rather than this one.
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})

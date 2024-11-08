@@ -128,7 +128,8 @@ public abstract class CsvSpecs {
          * If the caller wants to specify them explicitly, they can use this method. It is an error to set this
          * parameter if {@link #hasFixedWidthColumns} is false. Note that because the library is tolerant of the last
          * cell being shorter or wider than expected, the value specified here for the width of the last column is
-         * simply a placeholder; its value is ignored.  It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
+         * simply a placeholder; its value is ignored. It is an error to set this parameter if
+         * {@link #hasFixedWidthColumns} is false.
          */
         Builder fixedColumnWidths(Iterable<Integer> fixedColumnWidths);
 
@@ -138,10 +139,10 @@ public abstract class CsvSpecs {
          * chars). The difference arises when encountering characters outside the Unicode Basic Multilingual Plane. For
          * example, the Unicode code point 💔 (U+1F494) is one Unicode code point, but takes two Java chars to
          * represent. Along these lines, the string 💔💔💔 would fit in a column of width 3 when utf32CountingMode is
-         * true, but would require a column width of at least 6 when utf32CountingMode is false.
-         * The default setting of true is arguably more natural for users (the number of characters they see matches the
-         * visual width of the column). But some programs may want the value of false because they are counting Java
-         * chars. It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
+         * true, but would require a column width of at least 6 when utf32CountingMode is false. The default setting of
+         * true is arguably more natural for users (the number of characters they see matches the visual width of the
+         * column). But some programs may want the value of false because they are counting Java chars. It is an error
+         * to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder useUtf32CountingConvention(boolean useUtf32CountingConvention);
 
@@ -188,8 +189,7 @@ public abstract class CsvSpecs {
 
         /**
          * The field delimiter character (the character that separates one column from the next). Must be 7-bit ASCII.
-         * Defaults to {code ','}.
-         * It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
+         * Defaults to {code ','}. It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder delimiter(char delimiter);
 
@@ -219,8 +219,8 @@ public abstract class CsvSpecs {
         Builder ignoreSurroundingSpaces(boolean ignoreSurroundingSpaces);
 
         /**
-         * Whether to trim leading and trailing blanks from inside quoted values. Defaults to {@code false}.
-         * It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
+         * Whether to trim leading and trailing blanks from inside quoted values. Defaults to {@code false}. It is an
+         * error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder trim(boolean trim);
 
@@ -257,7 +257,8 @@ public abstract class CsvSpecs {
             problems.add("skipHeaderRows != 0 but hasHeaderRow is not set");
         }
 
-        // Certain items must not be set in fixed-width column mode. Other items must not be set in delimited column mode.
+        // Certain items must not be set in fixed-width column mode. Other items must not be set in delimited column
+        // mode.
         if (hasFixedWidthColumns()) {
             final String format = "Incompatible parameters: can't set %s when hasFixedWidthColumns is true";
             if (quote() != defaultQuote) {
