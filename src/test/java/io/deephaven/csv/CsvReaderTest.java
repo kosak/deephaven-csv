@@ -1985,6 +1985,60 @@ public class CsvReaderTest {
     }
 
     /**
+     * Like delimited mode, fixed-width mode allows header rows to be skipped.
+     */
+    @Test
+    public void fixedColumnWidthsSkipHeaderRows() throws CsvReaderException {
+        final String input =
+                ""
+                        + "front matter\n"
+        + "ignore me\n"
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOG  Dividend 0.25    200\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "Z     Dividend 0.18    500\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", "GOOG", "T", "Z"),
+                        Column.ofRefs("Type", "Dividend", "Dividend", "Dividend"),
+                        Column.ofValues("Price", 0.25, 0.15, 0.18),
+                        Column.ofValues("SecurityId", 200, 300, 500));
+
+        final CsvSpecs specs =
+                defaultCsvBuilder().hasFixedWidthColumns(true).skipHeaderRows(2).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
+     * Like delimited mode, fixed-width mode allows data rows to be skipped.
+     */
+    @Test
+    public void fixedColumnWidthsSkipDataRows() throws CsvReaderException {
+        final String input =
+                ""
+                        + "Sym   Type     Price   SecurityId\n"
+                        + "GOOG  Dividend 0.25    200\n"
+                        + "T     Dividend 0.15    300\n"
+                        + "XYZ1  Coupon   0.18    500\n"
+                        + "XYZ2  Coupon   0.37    900\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Sym", "T"),
+                        Column.ofRefs("Type", "Dividend"),
+                        Column.ofValues("Price", 0.15),
+                        Column.ofValues("SecurityId", 300));
+
+        // Skip 1 data row, take 2 data rows
+        final CsvSpecs specs =
+                defaultCsvBuilder().hasFixedWidthColumns(true).skipRows(1).numRows(2).build();
+
+        invokeTest(specs, input, expected);
+    }
+
+    /**
      * Like delimited mode, fixed-width mode allows rows to be short.
      */
     @ParameterizedTest

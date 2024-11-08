@@ -141,7 +141,7 @@ public abstract class CsvSpecs {
          * true, but would require a column width of at least 6 when utf32CountingMode is false.
          * The default setting of true is arguably more natural for users (the number of characters they see matches the
          * visual width of the column). But some programs may want the value of false because they are counting Java
-         * chars.
+         * chars. It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder useUtf32CountingConvention(boolean useUtf32CountingConvention);
 
@@ -189,6 +189,7 @@ public abstract class CsvSpecs {
         /**
          * The field delimiter character (the character that separates one column from the next). Must be 7-bit ASCII.
          * Defaults to {code ','}.
+         * It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder delimiter(char delimiter);
 
@@ -207,6 +208,8 @@ public abstract class CsvSpecs {
          * <li>hello, there
          * <li>456
          * </ul>
+         *
+         * It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder quote(char quote);
 
@@ -217,6 +220,7 @@ public abstract class CsvSpecs {
 
         /**
          * Whether to trim leading and trailing blanks from inside quoted values. Defaults to {@code false}.
+         * It is an error to set this parameter if {@link #hasFixedWidthColumns} is false.
          */
         Builder trim(boolean trim);
 
