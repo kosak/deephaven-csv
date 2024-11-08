@@ -2135,10 +2135,14 @@ public class CsvReaderTest {
      */
     @Test
     public void checkParametersIncompatibleWithDelimitedMode() {
+        final String expectedMessage =
+                "CsvSpecs failed validation for the following reasons: " +
+                        "Incompatible parameters: can't set fixedColumnWidths when hasFixedWidthColumns is false, " +
+                        "Incompatible parameters: can't set useUtf32CountingConvention when hasFixedWidthColumns is false";
+
         Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(false)
                 .useUtf32CountingConvention(false)
-                .fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()).hasMessage(
-                        "CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set fixedColumnWidths when hasFixedWidthColumns is false, Incompatible parameters: can't set useUtf32CountingConvention when hasFixedWidthColumns is false");
+                .fixedColumnWidths(Arrays.asList(1, 2, 3, 4)).build()).hasMessage(expectedMessage);
     }
 
     /**
@@ -2146,12 +2150,14 @@ public class CsvReaderTest {
      */
     @Test
     public void checkParametersIncompatibleWithFixedWidthMode() {
+        final String expectedMessage =
+                "CsvSpecs failed validation for the following reasons: " +
+                        "Incompatible parameters: can't set quote when hasFixedWidthColumns is true, " +
+                        "Incompatible parameters: can't set delimiter when hasFixedWidthColumns is true, " +
+                        "Incompatible parameters: can't set trim when hasFixedWidthColumns is true";
+
         Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(true)
-                .quote('X')
-                .delimiter('Y')
-                .trim(true)
-                .build()).hasMessage(
-                        "CsvSpecs failed validation for the following reasons: Incompatible parameters: can't set quote when hasFixedWidthColumns is true, Incompatible parameters: can't set delimiter when hasFixedWidthColumns is true, Incompatible parameters: can't set trim when hasFixedWidthColumns is true");
+                .quote('X').delimiter('Y').trim(true).build()).hasMessage(expectedMessage);
     }
 
     /**
