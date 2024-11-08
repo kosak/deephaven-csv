@@ -24,7 +24,7 @@ import java.util.function.Predicate;
 public abstract class CsvSpecs {
     public interface Builder {
         /**
-         * Copy all of the parameters from {@code specs} into {@code this} builder.
+         * Copy all the parameters from {@code specs} into {@code this} builder.
          */
         Builder from(CsvSpecs specs);
 
@@ -124,11 +124,11 @@ public abstract class CsvSpecs {
 
         /**
          * When {@link #hasFixedWidthColumns} is set, the library either determines the column widths from the header
-         * row (provided {@link #hasHeaderRow} is set), or the column widths can be specified explictly by the caller.
+         * row (provided {@link #hasHeaderRow} is set), or the column widths can be specified explicitly by the caller.
          * If the caller wants to specify them explicitly, they can use this method. It is an error to set this
-         * parameter if {@link #hasFixedWidthColumns} is false.
-         *
-         * @param fixedColumnWidths The caller-specified widths of the columns.
+         * parameter if {@link #hasFixedWidthColumns} is false. Note that because the library is tolerant of the last
+         * cell being shorter or wider than expected, the value specified here for the width of the last column is
+         * simply a placeholder; its value is ignored.
          */
         Builder fixedColumnWidths(Iterable<Integer> fixedColumnWidths);
 
