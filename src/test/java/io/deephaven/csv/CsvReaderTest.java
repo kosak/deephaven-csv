@@ -2025,10 +2025,10 @@ public class CsvReaderTest {
 
         final ColumnSet expected =
                 ColumnSet.of(
-                        Column.ofRefs("Sym", "T"),
-                        Column.ofRefs("Type", "Dividend"),
-                        Column.ofValues("Price", 0.15),
-                        Column.ofValues("SecurityId", 300));
+                        Column.ofRefs("Sym", "T", "XYZ1"),
+                        Column.ofRefs("Type", "Dividend", "Coupon"),
+                        Column.ofValues("Price", 0.15, 0.18),
+                        Column.ofValues("SecurityId", 300, 500));
 
         // Skip 1 data row, take 2 data rows
         final CsvSpecs specs =
