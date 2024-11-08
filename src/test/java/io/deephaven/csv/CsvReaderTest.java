@@ -2131,8 +2131,8 @@ public class CsvReaderTest {
     }
 
     /**
-     * Because the library is tolerant of the last cell being shorter or wider than expected,
-     * the final entry in fixedColumnWidths is just a placeholder.
+     * Because the library is tolerant of the last cell being shorter or wider than expected, the final entry in
+     * fixedColumnWidths is just a placeholder.
      */
     @ParameterizedTest
     @ValueSource(ints = {1, 5000, 34_000_000})
@@ -2197,8 +2197,10 @@ public class CsvReaderTest {
                 "CsvSpecs failed validation for the following reasons: " +
                         "Fixed column width -5 is invalid";
 
-        Assertions.assertThatThrownBy(() -> defaultCsvBuilder().hasFixedWidthColumns(true).fixedColumnWidths(Arrays.asList(-5, 3, 8))
-                .build()).hasMessage(expectedMessage);
+        Assertions.assertThatThrownBy(
+                () -> defaultCsvBuilder().hasFixedWidthColumns(true).fixedColumnWidths(Arrays.asList(-5, 3, 8))
+                        .build())
+                .hasMessage(expectedMessage);
     }
 
     /**
