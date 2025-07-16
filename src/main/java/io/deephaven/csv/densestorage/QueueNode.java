@@ -2,6 +2,23 @@ package io.deephaven.csv.densestorage;
 
 import java.util.concurrent.Semaphore;
 
+class QueueNodeTwo {
+    public final int[] controlBuffer;
+    public final int controlBegin;
+    public final int controlEnd;
+
+    public final byte[] packedBuffer;
+    public final int packedBegin;
+    public final int packedEnd;
+
+    public final byte[][] largeStringBuffer;
+    public final int largeStringBegin;
+    public final int largeStringEnd;
+
+    public final boolean isLast;
+    public final QueueNodeTwo next;
+}
+
 /**
  * Linked list node that holds data for a {@link DenseStorageWriter} or {@link DenseStorageReader}. All fields are
  * immutable except the "next" field. Synchronization for reading/writing the "next" field is managed by the

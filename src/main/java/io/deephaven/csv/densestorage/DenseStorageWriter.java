@@ -93,21 +93,111 @@ public final class DenseStorageWriter {
         return new Pair<>(writer, reader);
     }
 
+    public int[] controlBuffer;
+    public int controlBegin;
+    public int controlCurrent;
+
+    public byte[] packedBuffer;
+    public int packedBegin;
+    public int packedCurrent;
+
+    public byte[][] largeArrayBuffer;
+    public int largeArrayBegin;
+    public int largeArrayCurrent;
+
     /**
-     * The ints in this array indicate where the next item is stored:
-     *
-     * <ul>
-     * <li>{@link DenseStorageConstants#LARGE_BYTE_ARRAY_SENTINEL}: {@link DenseStorageWriter#largeByteArrayWriter}.
-     * <li>&gt; 0: {@link DenseStorageWriter#byteWriter} (the number of chars is equal to this value)
-     * <li>== 0: no bytes, so they're not stored anywhere. Will be interpreted as a ByteSlice with arbitrary byte data
-     * and length 0.
-     * </ul>
+     * Append a {@link ByteSlice} to the queue. The data will be diverted to one of the two specialized underlying
+     * queues, depending on its size.
      */
-    private final QueueWriter.IntWriter controlWriter;
-    /** Byte sequences < DENSE_THRESHOLD are compactly stored here */
-    private final QueueWriter.ByteWriter byteWriter;
-    /** Byte sequences >= DENSE_THRESHOLD are stored here */
-    private final QueueWriter.ByteArrayWriter largeByteArrayWriter;
+    public void append(final ByteSlice bs) {
+        final int size = bs.size();
+        if (size >= DenseStorageConstants.LARGE_THRESHOLD) {
+            final byte[] largeArray = new byte[size];
+            bs.copyTo(largeArray, 0);
+            addControlWord(DenseStorageConstants.LARGE_BYTE_ARRAY_SENTINEL);
+            addLargeArray(largeArray);
+        } else {
+            addControlWord(size);
+            addBytes(bs);
+        }
+    }
+
+    /** Call this method to indicate when you are finished writing to the queue. */
+    public void finish() {
+        flush();
+        appendFinishedSentinel();
+    }
+
+    private void addControlWord(int controlWord) {
+        if (controlCurrent == controlBuffer.length) {
+            flush();
+            controlBuffer = new int[DenseStorageConstants.CONTROL_QUEUE_SIZE];
+            controlBegin = 0;
+            controlCurrent = 0;
+        }
+        controlBuffer[controlCurrent] = controlWord;
+        ++controlCurrent;
+    }
+
+    private void addBytes(ByteSlice bs) {
+        final int sliceSize = bs.size();
+        if (sliceSize == 0) {
+            return;
+        }
+        assert sliceSize <= DenseStorageConstants.PACKED_QUEUE_SIZE;
+
+        if (packedCurrent + sliceSize > packedBuffer.length) {
+            flush();
+            packedBuffer = new byte[DenseStorageConstants.PACKED_QUEUE_SIZE];
+            packedBegin = 0;
+            packedCurrent = 0;
+        }
+        bs.copyTo(packedBuffer, packedCurrent);
+        packedCurrent += sliceSize;
+    }
+
+    private void addLargeArray(byte[] largeArray) {
+        if (largeArrayCurrent == largeArrayBuffer.length) {
+            flush();
+            largeArrayBuffer = new byte[DenseStorageConstants.LARGE_ARRAY_QUEUE_SIZE][];
+            largeArrayBegin = 0;
+            largeArrayCurrent = 0;
+        }
+        largeArrayBuffer[largeArrayCurrent] = largeArray;
+        ++largeArrayCurrent;
+    }
+
+    private void flush() {
+        // This new node now owns the following slices:
+        // controlBuffer[controlBegin..controlCurrent)  # half-open interval
+        // packedBuffer[packedBegin..packedCurrent)  # half-open interval
+        // largeArrayBuffer[largeArrayBegin..largeArrayCurrent)  # half-open interval
+        final QueueNodeTwo newNode = new QueueNodeTwo(controlBuffer, controlBegin, controlCurrent,
+                packedBuffer, packedBegin, packedCurrent,
+                largeArrayBuffer, largeArrayBegin, largeArrayCurrent);
+
+        // DenseStorageWriter now owns the following slices:
+        // controlBuffer[controlCurrent...end)  # half-open interval
+        // packedBuffer[packedCurrent...end)  # half-open interval
+        // largeArrayBuffer[largeArrayCurrent...end)  # half-open interval
+        controlBegin = controlCurrent;
+        packedBegin = packedCurrent;
+        largeArrayBegin = largeArrayCurrent;
+
+        try {
+            semaphore.acquire(1);
+        } catch (InterruptedException ie) {
+            throw new RuntimeException("Thread interrupted", ie);
+        }
+        synchronized (this) {
+            if (tail.next != null) {
+                throw new RuntimeException("next is already set");
+            }
+            tail.next = newNode;
+            tail = newNode;
+            notifyAll();
+        }
+    }
 
     private DenseStorageWriter(QueueWriter.IntWriter controlWriter, QueueWriter.ByteWriter byteWriter,
             QueueWriter.ByteArrayWriter largeByteArrayWriter) {
@@ -116,49 +206,5 @@ public final class DenseStorageWriter {
         this.largeByteArrayWriter = largeByteArrayWriter;
     }
 
-    /**
-     * Append a {@link ByteSlice} to the queue. The data will be diverted to one of the two specialized underlying
-     * queues, depending on its size.
-     */
-    public void append(final ByteSlice bs) {
-        final boolean fctrl, fdata;
-        final int size = bs.size();
-        if (size >= DenseStorageConstants.LARGE_THRESHOLD) {
-            final byte[] data = new byte[size];
-            bs.copyTo(data, 0);
-            fdata = largeByteArrayWriter.addByteArray(data);
-            fctrl = controlWriter.addInt(DenseStorageConstants.LARGE_BYTE_ARRAY_SENTINEL);
-        } else {
-            fdata = byteWriter.addBytes(bs);
-            fctrl = controlWriter.addInt(size);
-        }
-        // If any queue has flushed, flush the others as well, so the reader doesn't hang or deadlock. We want
-        // to do this because our flow control is based on limiting the number of queue blocks outstanding
-        // (per DenseStorageConstants.MAX_UNOBSERVED_BLOCKS). If our activity caused a flush on either data
-        // queue, we want to also flush the control queue so the reader has a chance to consume and the data
-        // queues doesn't get too far ahead. Likewise, if our activity caused a flush on the control queue,
-        // we flush for similar reasons (so the control queue doesn't get too far ahead).
-        // See https://github.com/deephaven/deephaven-csv/issues/101 and
-        // https://github.com/deephaven/deephaven-csv/issues/249.
-        // One might worry that it is inefficient to flush a queue whose block is not full, but (a) in practice it
-        // doesn't happen very often and (b) in our queue code, partially-filled blocks can share
-        // non-overlapping parts (slices) of their underlying storage array, so it's not particularly wasteful.
-        // Put another way, flushing a queue with an empty block does nothing; otherwise it allocates a new QueueNode
-        // sharing the same underlying data array but starting at the unwritten part of the array. (In the case that the
-        // block was just written was full, the array is still shared, but the slice representing the "unwritten part of
-        // the array" has length zero.) In any case, processing proceeds and a new array is allocated on demand once the
-        // current block becomes full.
-        if (fctrl || fdata) {
-            byteWriter.flush();
-            largeByteArrayWriter.flush();
-            controlWriter.flush();
-        }
-    }
 
-    /** Call this method to indicate when you are finished writing to the queue. */
-    public void finish() {
-        controlWriter.finish();
-        byteWriter.finish();
-        largeByteArrayWriter.finish();
-    }
 }

@@ -17,7 +17,7 @@ import java.util.function.IntFunction;
  *
  * <p>
  * In our implementation the {@link DenseStorageWriter} and {@link DenseStorageReader} are built out of various
- * QueueWriters and {@link QueueReader}s. This explains why the semantics of {@link DenseStorageWriter} and
+ * QueueWriters and {@link QueueReader}s. This explains why the sema1ntics of {@link DenseStorageWriter} and
  * {@link DenseStorageReader} are similar to those of the underlying QueueWriters and {@link QueueReader}s.
  */
 public class QueueWriter<TARRAY> {

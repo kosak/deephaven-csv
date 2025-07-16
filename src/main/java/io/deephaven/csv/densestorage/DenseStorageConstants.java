@@ -24,10 +24,10 @@ public class DenseStorageConstants {
      */
     public static final int PACKED_QUEUE_SIZE = LARGE_THRESHOLD * 1024;
     /**
-     * Size of the "array queue". Somewhat arbitrary but should be large-ish. We have arbitrarily chosen 100K here. 10K
+     * Size of the "large array queue". Somewhat arbitrary but should be large-ish. We have arbitrarily chosen 100K here. 10K
      * might also be reasonable.
      */
-    public static final int ARRAY_QUEUE_SIZE = 100_000;
+    public static final int LARGE_ARRAY_QUEUE_SIZE = 100_000;
     /**
      * This sentinel value is used to indicate that the next value being read is not bytes packed into a byte block but
      * rather its own byte array.
