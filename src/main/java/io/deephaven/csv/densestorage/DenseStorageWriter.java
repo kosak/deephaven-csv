@@ -174,12 +174,6 @@ public final class DenseStorageWriter {
     }
 
     private void flush(boolean isLast) {
-        try {
-            semaphore.acquire(1);
-        } catch (InterruptedException ie) {
-            throw new RuntimeException("Thread interrupted", ie);
-        }
-
         // This new node now owns the following slices (these are half-open intervals)
         // controlBuffer[controlBegin...controlCurrent)
         // packedBuffer[packedBegin...packedCurrent)
@@ -215,6 +209,13 @@ public final class DenseStorageWriter {
     }
 
     private void appendNode(QueueNode newNode) {
+        try {
+            semaphore.acquire(1);
+            System.out.println("TOOK 1 FROM THE SEMAPHORE IT IS NOW " + semaphore.availablePermits());
+        } catch (InterruptedException ie) {
+            throw new RuntimeException("Thread interrupted", ie);
+        }
+
         synchronized (this) {
             if (tail.next != null) {
                 throw new RuntimeException("next is already set");
