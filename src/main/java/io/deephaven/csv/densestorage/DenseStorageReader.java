@@ -90,6 +90,14 @@ public final class DenseStorageReader {
     }
 
     private void getSliceFromPackedArray(ByteSlice bs, int sizeNeeded) throws CsvReaderException {
+        if (sizeNeeded == 0) {
+            // If requested size is 0, then no bytes need to be pulled from the queue.
+            // In fact, trying to pull 0 bytes might trigger a premature move to the next
+            // node, which we don't want.
+            bs.reset(packedBuffer, packedCurrent, packedCurrent);
+            return;
+        }
+
         while (packedCurrent == packedEnd) {
             if (!tryRefill()) {
                 throw new CsvReaderException("Premature end of packed array stream");
