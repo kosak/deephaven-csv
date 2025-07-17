@@ -4,6 +4,8 @@ import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.util.MutableObject;
 import io.deephaven.csv.util.Pair;
 
+import java.util.concurrent.Semaphore;
+
 /**
  * The DenseStorageWriter and {@link DenseStorageReader} work in tandem, forming a FIFO queue. The DenseStorageWriter
  * writes data, and the {@link DenseStorageReader} reads that data. If the {@link DenseStorageReader} "catches up", it
@@ -81,15 +83,12 @@ import io.deephaven.csv.util.Pair;
 public final class DenseStorageWriter {
     /** Constructor */
     public static Pair<DenseStorageWriter, DenseStorageReader> create(final boolean concurrent) {
-        final Pair<QueueWriter.IntWriter, QueueReader.IntReader> control =
-                QueueWriter.IntWriter.create(DenseStorageConstants.CONTROL_QUEUE_SIZE, concurrent);
-        final Pair<QueueWriter.ByteWriter, QueueReader.ByteReader> bytes =
-                QueueWriter.ByteWriter.create(DenseStorageConstants.PACKED_QUEUE_SIZE, concurrent);
-        final Pair<QueueWriter.ByteArrayWriter, QueueReader.ByteArrayReader> byteArrays =
-                QueueWriter.ByteArrayWriter.create(DenseStorageConstants.ARRAY_QUEUE_SIZE, concurrent);
-
-        final DenseStorageWriter writer = new DenseStorageWriter(control.first, bytes.first, byteArrays.first);
-        final DenseStorageReader reader = new DenseStorageReader(control.second, bytes.second, byteArrays.second);
+        final int maxUnobservedBlocks = concurrent ? DenseStorageConstants.MAX_UNOBSERVED_BLOCKS : Integer.MAX_VALUE;
+        final Semaphore semaphore = new Semaphore(maxUnobservedBlocks);
+        // A placeholder node to hold the "next" field for both writer and reader.
+        final QueueNodeTwo headNode = new QueueNodeTwo(null, 0, 0, null, 0, 0, null, 0, 0);
+        final DenseStorageWriter writer = new DenseStorageWriter(semaphore, headNode);
+        final DenseStorageReader reader = new DenseStorageReader(semaphore, headNode);
         return new Pair<>(writer, reader);
     }
 
@@ -124,13 +123,12 @@ public final class DenseStorageWriter {
 
     /** Call this method to indicate when you are finished writing to the queue. */
     public void finish() {
-        flush();
-        appendFinishedSentinel();
+        flush(true);
     }
 
     private void addControlWord(int controlWord) {
         if (controlCurrent == controlBuffer.length) {
-            flush();
+            flush(false);
             controlBuffer = new int[DenseStorageConstants.CONTROL_QUEUE_SIZE];
             controlBegin = 0;
             controlCurrent = 0;
@@ -147,7 +145,7 @@ public final class DenseStorageWriter {
         assert sliceSize <= DenseStorageConstants.PACKED_QUEUE_SIZE;
 
         if (packedCurrent + sliceSize > packedBuffer.length) {
-            flush();
+            flush(false);
             packedBuffer = new byte[DenseStorageConstants.PACKED_QUEUE_SIZE];
             packedBegin = 0;
             packedCurrent = 0;
@@ -158,7 +156,7 @@ public final class DenseStorageWriter {
 
     private void addLargeArray(byte[] largeArray) {
         if (largeArrayCurrent == largeArrayBuffer.length) {
-            flush();
+            flush(false);
             largeArrayBuffer = new byte[DenseStorageConstants.LARGE_ARRAY_QUEUE_SIZE][];
             largeArrayBegin = 0;
             largeArrayCurrent = 0;
@@ -167,7 +165,7 @@ public final class DenseStorageWriter {
         ++largeArrayCurrent;
     }
 
-    private void flush() {
+    private void flush(boolean isLast) {
         // This new node now owns the following slices:
         // controlBuffer[controlBegin..controlCurrent)  # half-open interval
         // packedBuffer[packedBegin..packedCurrent)  # half-open interval
@@ -184,11 +182,33 @@ public final class DenseStorageWriter {
         packedBegin = packedCurrent;
         largeArrayBegin = largeArrayCurrent;
 
+
+        appendNode(newNode);
+
+        if (!isLast) {
+            return;
+        }
+
+        appendNode(QueueNodeTwo.FINISHED_SENTINEL);
+        // hygeine
+        controlBuffer = null;
+        controlBegin = 0;
+        controlCurrent = 0;
+        packedBuffer = null;
+        packedBegin = 0;
+        packedCurrent = 0;
+        largeArrayBuffer = null;
+        largeArrayBegin = 0;
+        largeArrayCurrent = 0;
+    }
+
+    private void appendNode(QueueNodeTwo newNode) {
         try {
             semaphore.acquire(1);
         } catch (InterruptedException ie) {
             throw new RuntimeException("Thread interrupted", ie);
         }
+
         synchronized (this) {
             if (tail.next != null) {
                 throw new RuntimeException("next is already set");
@@ -198,13 +218,4 @@ public final class DenseStorageWriter {
             notifyAll();
         }
     }
-
-    private DenseStorageWriter(QueueWriter.IntWriter controlWriter, QueueWriter.ByteWriter byteWriter,
-            QueueWriter.ByteArrayWriter largeByteArrayWriter) {
-        this.controlWriter = controlWriter;
-        this.byteWriter = byteWriter;
-        this.largeByteArrayWriter = largeByteArrayWriter;
-    }
-
-
 }
