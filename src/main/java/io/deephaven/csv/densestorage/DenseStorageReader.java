@@ -85,4 +85,36 @@ public final class DenseStorageReader {
         bs.reset(packedBuffer, packedCurrent, packedEnd);
         packedCurrent = packedEnd;
     }
+
+    private boolean tryRefill() throws CsvReaderException {
+        if (controlCurrent != controlBuffer.length ||
+                packedCurrent != packedBuffer.length ||
+                largeArrayCurrent != largeArrayBuffer.length) {
+            throw new CsvReaderException("Assertion failure: discarding unread data");
+        }
+
+        if (tail.hasTheQualityOfBeingEOds()) {
+            return false;
+        }
+
+        boolean needsRelease;
+        synchronized (this) {
+            while (tail.next == null) {
+                try {
+                    wait();
+                } catch (InterruptedException ie) {
+                    throw new RuntimeException("Thread interrupted", ie);
+                }
+            }
+            final QueueNode newNode = tail.next;
+            needsRelease = !newNode.hasBeenObserved;
+            newNode.hasBeenObserved = true;
+            tail = newNode;
+        }
+        if (needsRelease) {
+            semaphore.release();
+        }
+
+        return tail.hasTheQualityOfBeingEOds();
+    }
 }

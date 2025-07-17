@@ -86,7 +86,7 @@ public final class DenseStorageWriter {
         final int maxUnobservedBlocks = concurrent ? DenseStorageConstants.MAX_UNOBSERVED_BLOCKS : Integer.MAX_VALUE;
         final Semaphore semaphore = new Semaphore(maxUnobservedBlocks);
         // A placeholder node to hold the "next" field for both writer and reader.
-        final QueueNodeTwo headNode = new QueueNodeTwo(null, 0, 0, null, 0, 0, null, 0, 0);
+        final QueueNode headNode = new QueueNode(null, 0, 0, null, 0, 0, null, 0, 0);
         final DenseStorageWriter writer = new DenseStorageWriter(semaphore, headNode);
         final DenseStorageReader reader = new DenseStorageReader(semaphore, headNode);
         return new Pair<>(writer, reader);
