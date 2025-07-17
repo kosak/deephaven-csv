@@ -92,17 +92,17 @@ public final class DenseStorageWriter {
         return new Pair<>(writer, reader);
     }
 
-    public int[] controlBuffer;
-    public int controlBegin;
-    public int controlCurrent;
+    private int[] controlBuffer;
+    private int controlBegin;
+    private int controlCurrent;
 
-    public byte[] packedBuffer;
-    public int packedBegin;
-    public int packedCurrent;
+    private byte[] packedBuffer;
+    private int packedBegin;
+    private int packedCurrent;
 
-    public byte[][] largeArrayBuffer;
-    public int largeArrayBegin;
-    public int largeArrayCurrent;
+    private byte[][] largeArrayBuffer;
+    private int largeArrayBegin;
+    private int largeArrayCurrent;
 
     /**
      * Append a {@link ByteSlice} to the queue. The data will be diverted to one of the two specialized underlying
@@ -182,14 +182,13 @@ public final class DenseStorageWriter {
         packedBegin = packedCurrent;
         largeArrayBegin = largeArrayCurrent;
 
-
         appendNode(newNode);
 
         if (!isLast) {
             return;
         }
 
-        appendNode(QueueNodeTwo.FINISHED_SENTINEL);
+        appendNode(QueueNodeTwo.FINISHED_SENTINEL_DONT_TRY_TO_SHARE_THIS_BECAUSE_SEMAPHORE_AND_OBSERVED_FLAG);
         // hygeine
         controlBuffer = null;
         controlBegin = 0;

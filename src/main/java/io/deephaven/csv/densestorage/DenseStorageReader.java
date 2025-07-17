@@ -6,14 +6,14 @@ import io.deephaven.csv.util.MutableInt;
 
 /** Companion to the {@link DenseStorageWriter}. See the documentation there for details. */
 public final class DenseStorageReader {
-    /** Control bytes (lengths, negated lengths, or sentinels). See DenseStorageWriter. */
-    private final QueueReader.IntReader controlReader;
-    /** Byte sequences < DENSE_THRESHOLD are compactly stored here */
-    private final QueueReader.ByteReader byteReader;
-    /** Byte sequences >= DENSE_THRESHOLD are stored here */
-    private final QueueReader.ByteArrayReader largeByteArrayReader;
-    /** For the "out" parameter of controlReader.tryGetInt() */
-    private final MutableInt intHolder;
+    private int[] controlBuffer;
+    private int controlCurrent;
+
+    private byte[] packedBuffer;
+    private int packedCurrent;
+
+    private byte[][] largeArrayBuffer;
+    private int largeArrayCurrent;
 
     /** Constructor. */
     public DenseStorageReader(
@@ -38,23 +38,51 @@ public final class DenseStorageReader {
      * @return true if there is more data, and the ByteSlice has been populated. Otherwise, false.
      */
     public boolean tryGetNextSlice(final ByteSlice bs) throws CsvReaderException {
-        if (!controlReader.tryGetInt(intHolder)) {
+        if (!tryGetControlWord(intHolder)) {
             return false;
         }
         final int control = intHolder.intValue();
         if (control == DenseStorageConstants.LARGE_BYTE_ARRAY_SENTINEL) {
-            mustSucceed(largeByteArrayReader.tryGetBytes(bs), "largeByteArrayReader");
-            return true;
+            getSliceFromLargeArray(bs);
+        } else {
+            getSliceFromPackedArray(bs, control);
         }
-        mustSucceed(byteReader.tryGetBytes(control, bs), "byteReader");
         return true;
     }
 
-    /** Convenience method that throws an exception if "success" is false. */
-    private static void mustSucceed(final boolean success, final String what)
-            throws CsvReaderException {
-        if (!success) {
-            throw new CsvReaderException("Data unexpectedly exhausted: " + what);
+    private int tryGetControlWord() {
+        while (controlCurrent == controlBuffer.length) {
+            if (!tryRefill()) {
+                return DenseStorageConstants.END_OF_STREAM_SENTINEL;
+            }
         }
+        return controlBuffer[controlCurrent++];
+    }
+
+    private void getSliceFromLargeArray(ByteSlice bs) throws CsvReaderException {
+        while (largeArrayCurrent == largeArrayBuffer.length) {
+            if (!tryRefill()) {
+                throw new CsvReaderException("Premature end of large array stream");
+            }
+        }
+        byte[] slice = largeArrayBuffer[largeArrayCurrent++];
+        bs.reset(slice, 0, slice.length);
+    }
+
+    private void getSliceFromPackedArray(ByteSlice bs, int sizeNeeded) throws CsvReaderException {
+        while (packedCurrent == packedBuffer.length) {
+            if (!tryRefill()) {
+                throw new CsvReaderException("Premature end of packed array stream");
+            }
+        }
+        if (packedCurrent + sizeNeeded > packedBuffer.length) {
+            int availableSize = packedBuffer.length - packedCurrent;
+            throw new CsvReaderException(
+                    String.format(
+                            "Assertion failure: got short block: expected at least %d, got %d", sizeNeeded, availableSize));
+        }
+        final int packedEnd = packedCurrent + sizeNeeded;
+        bs.reset(packedBuffer, packedCurrent, packedEnd);
+        packedCurrent = packedEnd;
     }
 }
