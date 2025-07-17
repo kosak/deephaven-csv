@@ -4,44 +4,58 @@ import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.MutableInt;
 
+import java.util.concurrent.Semaphore;
+
 /** Companion to the {@link DenseStorageWriter}. See the documentation there for details. */
 public final class DenseStorageReader {
-    private int[] controlBuffer;
-    private int controlCurrent;
+    private final Semaphore semaphore;
+    private QueueNode tail;
 
-    private byte[] packedBuffer;
-    private int packedCurrent;
+    private int[] controlBuffer = new int[0];
+    private int controlCurrent = 0;
 
-    private byte[][] largeArrayBuffer;
-    private int largeArrayCurrent;
+    private byte[] packedBuffer = new byte[0];
+    private int packedCurrent = 0;
+
+    private byte[][] largeArrayBuffer = new byte[0][];
+    private int largeArrayCurrent = 0;
 
     /** Constructor. */
-    public DenseStorageReader(
-            final QueueReader.IntReader controlReader,
-            final QueueReader.ByteReader byteReader,
-            final QueueReader.ByteArrayReader largeByteArrayReader) {
-        this.controlReader = controlReader;
-        this.byteReader = byteReader;
-        this.largeByteArrayReader = largeByteArrayReader;
-        this.intHolder = new MutableInt();
-    }
-
-    public DenseStorageReader copy() {
-        return new DenseStorageReader(controlReader.copy(), byteReader.copy(), largeByteArrayReader.copy());
+    public DenseStorageReader(Semaphore semaphore, QueueNode head) {
+        this.semaphore = semaphore;
+        this.tail = head;
     }
 
     /**
-     * Tries to get the next slice from one of the inner QueueReaders. Uses data in the 'controlReader' to figure out
-     * which QueueReader the next slice is coming from.
-     *
+     * Constructor that copies the state of 'other'.
+     * @param other The other object
+     */
+    private DenseStorageReader(DenseStorageReader other) {
+        this.semaphore = other.semaphore;
+        this.tail = other.tail;
+        this.controlBuffer = other.controlBuffer;
+        this.controlCurrent = other.controlCurrent;
+        this.packedBuffer = other.packedBuffer;
+        this.packedCurrent = other.packedCurrent;
+        this.largeArrayBuffer = other.largeArrayBuffer;
+        this.largeArrayCurrent = other.largeArrayCurrent;
+    }
+
+    public DenseStorageReader copy() {
+        return new DenseStorageReader(this);
+    }
+
+    /**
+     * Tries to get the next slice from the queue. Uses data in the 'control' queue to figure out
+     * which data queue ('packed' or 'largeArray') the next slice is coming from.
      * @param bs If the method returns true, the contents of this parameter will be updated.
      * @return true if there is more data, and the ByteSlice has been populated. Otherwise, false.
      */
     public boolean tryGetNextSlice(final ByteSlice bs) throws CsvReaderException {
-        if (!tryGetControlWord(intHolder)) {
+        final int control = tryGetControlWord();
+        if (control == DenseStorageConstants.END_OF_STREAM_SENTINEL) {
             return false;
         }
-        final int control = intHolder.intValue();
         if (control == DenseStorageConstants.LARGE_BYTE_ARRAY_SENTINEL) {
             getSliceFromLargeArray(bs);
         } else {
@@ -50,7 +64,7 @@ public final class DenseStorageReader {
         return true;
     }
 
-    private int tryGetControlWord() {
+    private int tryGetControlWord() throws CsvReaderException {
         while (controlCurrent == controlBuffer.length) {
             if (!tryRefill()) {
                 return DenseStorageConstants.END_OF_STREAM_SENTINEL;
@@ -93,7 +107,7 @@ public final class DenseStorageReader {
             throw new CsvReaderException("Assertion failure: discarding unread data");
         }
 
-        if (tail.hasTheQualityOfBeingEOds()) {
+        if (tail == QueueNode.END_OF_STREAM_SENTINEL) {
             return false;
         }
 
@@ -106,15 +120,14 @@ public final class DenseStorageReader {
                     throw new RuntimeException("Thread interrupted", ie);
                 }
             }
-            final QueueNode newNode = tail.next;
-            needsRelease = !newNode.hasBeenObserved;
-            newNode.hasBeenObserved = true;
-            tail = newNode;
+            needsRelease = !tail.appendHasBeenObserved;
+            tail.appendHasBeenObserved = true;
+            tail = tail.next;
         }
         if (needsRelease) {
             semaphore.release();
         }
 
-        return tail.hasTheQualityOfBeingEOds();
+        return tail != QueueNode.END_OF_STREAM_SENTINEL;
     }
 }

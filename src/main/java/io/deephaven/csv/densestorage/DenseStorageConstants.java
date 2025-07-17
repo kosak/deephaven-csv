@@ -34,6 +34,10 @@ public class DenseStorageConstants {
      */
     public static final int LARGE_BYTE_ARRAY_SENTINEL = -1;
     /**
+     * This sentinel value is used to indicate that there are no more entries in the queue.
+     */
+    public static final int END_OF_STREAM_SENTINEL = -2;
+    /**
      * The maximum number of data blocks that we allow to go unobserved before the blocking the QueueWriter. This is
      * only used when {@link CsvSpecs#concurrent()} is true.
      */

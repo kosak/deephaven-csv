@@ -92,17 +92,25 @@ public final class DenseStorageWriter {
         return new Pair<>(writer, reader);
     }
 
-    private int[] controlBuffer;
-    private int controlBegin;
-    private int controlCurrent;
+    private final Semaphore semaphore;
+    private QueueNode tail;
 
-    private byte[] packedBuffer;
-    private int packedBegin;
-    private int packedCurrent;
+    private int[] controlBuffer = new int[0];
+    private int controlBegin = 0;
+    private int controlCurrent = 0;
 
-    private byte[][] largeArrayBuffer;
-    private int largeArrayBegin;
-    private int largeArrayCurrent;
+    private byte[] packedBuffer = new byte[0];
+    private int packedBegin = 0;
+    private int packedCurrent = 0;
+
+    private byte[][] largeArrayBuffer = new byte[0][];
+    private int largeArrayBegin = 0;
+    private int largeArrayCurrent = 0;
+
+    public DenseStorageWriter(Semaphore semaphore, QueueNode tail) {
+        this.semaphore = semaphore;
+        this.tail = tail;
+    }
 
     /**
      * Append a {@link ByteSlice} to the queue. The data will be diverted to one of the two specialized underlying
@@ -166,48 +174,47 @@ public final class DenseStorageWriter {
     }
 
     private void flush(boolean isLast) {
-        // This new node now owns the following slices:
-        // controlBuffer[controlBegin..controlCurrent)  # half-open interval
-        // packedBuffer[packedBegin..packedCurrent)  # half-open interval
-        // largeArrayBuffer[largeArrayBegin..largeArrayCurrent)  # half-open interval
-        final QueueNodeTwo newNode = new QueueNodeTwo(controlBuffer, controlBegin, controlCurrent,
-                packedBuffer, packedBegin, packedCurrent,
-                largeArrayBuffer, largeArrayBegin, largeArrayCurrent);
-
-        // DenseStorageWriter now owns the following slices:
-        // controlBuffer[controlCurrent...end)  # half-open interval
-        // packedBuffer[packedCurrent...end)  # half-open interval
-        // largeArrayBuffer[largeArrayCurrent...end)  # half-open interval
-        controlBegin = controlCurrent;
-        packedBegin = packedCurrent;
-        largeArrayBegin = largeArrayCurrent;
-
-        appendNode(newNode);
-
-        if (!isLast) {
-            return;
-        }
-
-        appendNode(QueueNodeTwo.FINISHED_SENTINEL_DONT_TRY_TO_SHARE_THIS_BECAUSE_SEMAPHORE_AND_OBSERVED_FLAG);
-        // hygeine
-        controlBuffer = null;
-        controlBegin = 0;
-        controlCurrent = 0;
-        packedBuffer = null;
-        packedBegin = 0;
-        packedCurrent = 0;
-        largeArrayBuffer = null;
-        largeArrayBegin = 0;
-        largeArrayCurrent = 0;
-    }
-
-    private void appendNode(QueueNodeTwo newNode) {
         try {
             semaphore.acquire(1);
         } catch (InterruptedException ie) {
             throw new RuntimeException("Thread interrupted", ie);
         }
 
+        // This new node now owns the following slices (these are half-open intervals)
+        // controlBuffer[controlBegin...controlCurrent)
+        // packedBuffer[packedBegin...packedCurrent)
+        // largeArrayBuffer[largeArrayBegin...largeArrayCurrent)
+        final QueueNode newNode = new QueueNode(controlBuffer, controlBegin, controlCurrent,
+                packedBuffer, packedBegin, packedCurrent,
+                largeArrayBuffer, largeArrayBegin, largeArrayCurrent);
+
+        // DenseStorageWriter now owns suffix of the buffers after what the QueueNode owns.
+        // controlBuffer[controlCurrent...end)
+        // packedBuffer[packedCurrent...end)
+        // largeArrayBuffer[largeArrayCurrent...end)
+        controlBegin = controlCurrent;
+        packedBegin = packedCurrent;
+        largeArrayBegin = largeArrayCurrent;
+
+        appendNode(newNode);
+
+        if (isLast) {
+            // hygeine
+            controlBuffer = null;
+            controlBegin = 0;
+            controlCurrent = 0;
+            packedBuffer = null;
+            packedBegin = 0;
+            packedCurrent = 0;
+            largeArrayBuffer = null;
+            largeArrayBegin = 0;
+            largeArrayCurrent = 0;
+
+            appendNode(QueueNode.END_OF_STREAM_SENTINEL);
+        }
+    }
+
+    private void appendNode(QueueNode newNode) {
         synchronized (this) {
             if (tail.next != null) {
                 throw new RuntimeException("next is already set");
