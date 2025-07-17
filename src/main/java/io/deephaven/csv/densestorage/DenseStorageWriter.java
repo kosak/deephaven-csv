@@ -84,14 +84,16 @@ public final class DenseStorageWriter {
     /** Constructor */
     public static Pair<DenseStorageWriter, DenseStorageReader> create(final boolean concurrent) {
         final int maxUnobservedBlocks = concurrent ? DenseStorageConstants.MAX_UNOBSERVED_BLOCKS : Integer.MAX_VALUE;
+        final Object syncRoot = new Object();
         final Semaphore semaphore = new Semaphore(maxUnobservedBlocks);
         // A placeholder node to hold the "next" field for both writer and reader.
         final QueueNode headNode = new QueueNode(null, 0, 0, null, 0, 0, null, 0, 0);
-        final DenseStorageWriter writer = new DenseStorageWriter(semaphore, headNode);
-        final DenseStorageReader reader = new DenseStorageReader(semaphore, headNode);
+        final DenseStorageWriter writer = new DenseStorageWriter(syncRoot, semaphore, headNode);
+        final DenseStorageReader reader = new DenseStorageReader(syncRoot, semaphore, headNode);
         return new Pair<>(writer, reader);
     }
 
+    private final Object syncRoot;
     private final Semaphore semaphore;
     private QueueNode tail;
 
@@ -107,7 +109,8 @@ public final class DenseStorageWriter {
     private int largeArrayBegin = 0;
     private int largeArrayCurrent = 0;
 
-    public DenseStorageWriter(Semaphore semaphore, QueueNode tail) {
+    public DenseStorageWriter(Object syncRoot, Semaphore semaphore, QueueNode tail) {
+        this.syncRoot = syncRoot;
         this.semaphore = semaphore;
         this.tail = tail;
     }
@@ -192,20 +195,21 @@ public final class DenseStorageWriter {
 
         appendNode(newNode);
 
-        if (isLast) {
-            // hygeine
-            controlBuffer = null;
-            controlBegin = 0;
-            controlCurrent = 0;
-            packedBuffer = null;
-            packedBegin = 0;
-            packedCurrent = 0;
-            largeArrayBuffer = null;
-            largeArrayBegin = 0;
-            largeArrayCurrent = 0;
-
-            appendNode(QueueNode.END_OF_STREAM_SENTINEL);
+        if (!isLast) {
+            return;
         }
+        // hygeine
+        controlBuffer = null;
+        controlBegin = 0;
+        controlCurrent = 0;
+        packedBuffer = null;
+        packedBegin = 0;
+        packedCurrent = 0;
+        largeArrayBuffer = null;
+        largeArrayBegin = 0;
+        largeArrayCurrent = 0;
+
+        appendNode(QueueNode.END_OF_STREAM_SENTINEL);
     }
 
     private void appendNode(QueueNode newNode) {
@@ -215,13 +219,13 @@ public final class DenseStorageWriter {
             throw new RuntimeException("Thread interrupted", ie);
         }
 
-        synchronized (this) {
+        synchronized (syncRoot) {
             if (tail.next != null) {
                 throw new RuntimeException("next is already set");
             }
             tail.next = newNode;
             tail = newNode;
-            notifyAll();
+            syncRoot.notifyAll();
         }
     }
 }

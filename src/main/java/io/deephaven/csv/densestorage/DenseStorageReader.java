@@ -8,6 +8,7 @@ import java.util.concurrent.Semaphore;
 
 /** Companion to the {@link DenseStorageWriter}. See the documentation there for details. */
 public final class DenseStorageReader {
+    private final Object syncRoot;
     private final Semaphore semaphore;
     private QueueNode tail;
 
@@ -24,7 +25,8 @@ public final class DenseStorageReader {
     private int largeArrayEnd = 0;
 
     /** Constructor. */
-    public DenseStorageReader(Semaphore semaphore, QueueNode head) {
+    public DenseStorageReader(Object syncRoot, Semaphore semaphore, QueueNode head) {
+        this.syncRoot = syncRoot;
         this.semaphore = semaphore;
         this.tail = head;
     }
@@ -34,6 +36,7 @@ public final class DenseStorageReader {
      * @param other The other object
      */
     private DenseStorageReader(DenseStorageReader other) {
+        this.syncRoot = other.syncRoot;
         this.semaphore = other.semaphore;
         this.tail = other.tail;
         this.controlBuffer = other.controlBuffer;
@@ -126,10 +129,10 @@ public final class DenseStorageReader {
         }
 
         boolean needsRelease;
-        synchronized (this) {
+        synchronized (syncRoot) {
             while (tail.next == null) {
                 try {
-                    wait();
+                    syncRoot.wait();
                 } catch (InterruptedException ie) {
                     throw new RuntimeException("Thread interrupted", ie);
                 }
