@@ -211,7 +211,6 @@ public final class DenseStorageWriter {
     private void appendNode(QueueNode newNode) {
         try {
             semaphore.acquire(1);
-            System.out.println("TOOK 1 FROM THE SEMAPHORE IT IS NOW " + semaphore.availablePermits());
         } catch (InterruptedException ie) {
             throw new RuntimeException("Thread interrupted", ie);
         }

@@ -11,14 +11,17 @@ public final class DenseStorageReader {
     private final Semaphore semaphore;
     private QueueNode tail;
 
-    private int[] controlBuffer = new int[0];
+    private int[] controlBuffer = null;
     private int controlCurrent = 0;
+    private int controlEnd = 0;
 
-    private byte[] packedBuffer = new byte[0];
+    private byte[] packedBuffer = null;
     private int packedCurrent = 0;
+    private int packedEnd = 0;
 
-    private byte[][] largeArrayBuffer = new byte[0][];
+    private byte[][] largeArrayBuffer = null;
     private int largeArrayCurrent = 0;
+    private int largeArrayEnd = 0;
 
     /** Constructor. */
     public DenseStorageReader(Semaphore semaphore, QueueNode head) {
@@ -35,10 +38,13 @@ public final class DenseStorageReader {
         this.tail = other.tail;
         this.controlBuffer = other.controlBuffer;
         this.controlCurrent = other.controlCurrent;
+        this.controlEnd = other.controlEnd;
         this.packedBuffer = other.packedBuffer;
         this.packedCurrent = other.packedCurrent;
+        this.packedEnd = other.packedEnd;
         this.largeArrayBuffer = other.largeArrayBuffer;
         this.largeArrayCurrent = other.largeArrayCurrent;
+        this.largeArrayEnd = other.largeArrayEnd;
     }
 
     public DenseStorageReader copy() {
@@ -65,7 +71,7 @@ public final class DenseStorageReader {
     }
 
     private int tryGetControlWord() throws CsvReaderException {
-        while (controlCurrent == controlBuffer.length) {
+        while (controlCurrent == controlEnd) {
             if (!tryRefill()) {
                 return DenseStorageConstants.END_OF_STREAM_SENTINEL;
             }
@@ -74,7 +80,7 @@ public final class DenseStorageReader {
     }
 
     private void getSliceFromLargeArray(ByteSlice bs) throws CsvReaderException {
-        while (largeArrayCurrent == largeArrayBuffer.length) {
+        while (largeArrayCurrent == largeArrayEnd) {
             if (!tryRefill()) {
                 throw new CsvReaderException("Premature end of large array stream");
             }
@@ -84,13 +90,13 @@ public final class DenseStorageReader {
     }
 
     private void getSliceFromPackedArray(ByteSlice bs, int sizeNeeded) throws CsvReaderException {
-        while (packedCurrent == packedBuffer.length) {
+        while (packedCurrent == packedEnd) {
             if (!tryRefill()) {
                 throw new CsvReaderException("Premature end of packed array stream");
             }
         }
-        if (packedCurrent + sizeNeeded > packedBuffer.length) {
-            int availableSize = packedBuffer.length - packedCurrent;
+        if (packedCurrent + sizeNeeded > packedEnd) {
+            int availableSize = packedEnd - packedCurrent;
             throw new CsvReaderException(
                     String.format(
                             "Assertion failure: got short block: expected at least %d, got %d", sizeNeeded, availableSize));
@@ -101,9 +107,9 @@ public final class DenseStorageReader {
     }
 
     private boolean tryRefill() throws CsvReaderException {
-        if (controlCurrent != controlBuffer.length ||
-                packedCurrent != packedBuffer.length ||
-                largeArrayCurrent != largeArrayBuffer.length) {
+        if (controlCurrent != controlEnd ||
+                packedCurrent != packedEnd ||
+                largeArrayCurrent != largeArrayEnd) {
             throw new CsvReaderException("Assertion failure: discarding unread data");
         }
 
@@ -127,6 +133,18 @@ public final class DenseStorageReader {
         if (needsRelease) {
             semaphore.release();
         }
+
+        controlBuffer = tail.controlBuffer;
+        controlCurrent = tail.controlBegin;
+        controlEnd = tail.controlEnd;
+
+        packedBuffer = tail.packedBuffer;
+        packedCurrent = tail.packedBegin;
+        packedEnd = tail.packedEnd;
+
+        largeArrayBuffer = tail.largeArryBuffer;
+        largeArrayCurrent = tail.largeArrayBegin;
+        largeArrayEnd = tail.largeArrayEnd;;
 
         return tail != QueueNode.END_OF_STREAM_SENTINEL;
     }
