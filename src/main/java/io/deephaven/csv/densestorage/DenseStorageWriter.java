@@ -95,15 +95,15 @@ public final class DenseStorageWriter {
     private final Semaphore semaphore;
     private QueueNode tail;
 
-    private int[] controlBuffer = new int[0];
+    private int[] controlBuffer = new int[DenseStorageConstants.CONTROL_QUEUE_SIZE];
     private int controlBegin = 0;
     private int controlCurrent = 0;
 
-    private byte[] packedBuffer = new byte[0];
+    private byte[] packedBuffer = new byte[DenseStorageConstants.PACKED_QUEUE_SIZE];
     private int packedBegin = 0;
     private int packedCurrent = 0;
 
-    private byte[][] largeArrayBuffer = new byte[0][];
+    private byte[][] largeArrayBuffer = new byte[DenseStorageConstants.LARGE_ARRAY_QUEUE_SIZE][];
     private int largeArrayBegin = 0;
     private int largeArrayCurrent = 0;
 
