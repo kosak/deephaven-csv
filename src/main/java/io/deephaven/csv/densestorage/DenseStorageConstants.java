@@ -12,11 +12,6 @@ public class DenseStorageConstants {
      */
     public static final int LARGE_THRESHOLD = 1024;
     /**
-     * Size of the "control queue" blocks. Somewhat arbitrary but should be large-ish. We have arbitrarily chosen
-     * 100,000 here.
-     */
-    public static final int CONTROL_QUEUE_SIZE = 100_000;
-    /**
      * Size of the "packed" byte blocks. The number chosen in somewhat arbitrary but it should be large-ish (100K? 1M?)
      * for performance and a decent multiple of LARGE_THRESHOLD to avoid wasting too much space at the end of each
      * block. By making it 1024x the size of LARGE_THRESHOLD, we can show that the fraction of wasted space at the end

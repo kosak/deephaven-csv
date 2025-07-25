@@ -4,6 +4,7 @@ import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.util.MutableObject;
 import io.deephaven.csv.util.Pair;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -87,7 +88,7 @@ public final class DenseStorageWriter {
         final Object syncRoot = new Object();
         final Semaphore semaphore = new Semaphore(maxUnobservedBlocks);
         // A placeholder node to hold the "next" field for both writer and reader.
-        final QueueNode headNode = new QueueNode(null, 0, 0, null, 0, 0, null, 0, 0);
+        final QueueNode headNode = new QueueNode(null, 0, 0, null, 0, 0);
         final DenseStorageWriter writer = new DenseStorageWriter(syncRoot, semaphore, headNode);
         final DenseStorageReader reader = new DenseStorageReader(syncRoot, semaphore, headNode);
         return new Pair<>(writer, reader);
@@ -97,10 +98,6 @@ public final class DenseStorageWriter {
     private final Semaphore semaphore;
     private QueueNode tail;
 
-    private int[] controlBuffer = new int[DenseStorageConstants.CONTROL_QUEUE_SIZE];
-    private int controlBegin = 0;
-    private int controlCurrent = 0;
-
     private byte[] packedBuffer = new byte[DenseStorageConstants.PACKED_QUEUE_SIZE];
     private int packedBegin = 0;
     private int packedCurrent = 0;
@@ -108,6 +105,8 @@ public final class DenseStorageWriter {
     private byte[][] largeArrayBuffer = new byte[DenseStorageConstants.LARGE_ARRAY_QUEUE_SIZE][];
     private int largeArrayBegin = 0;
     private int largeArrayCurrent = 0;
+
+    private final ByteSlice controlWordByteSlice = new ByteSlice(new byte[4], 0, 4);
 
     public DenseStorageWriter(Object syncRoot, Semaphore semaphore, QueueNode tail) {
         this.syncRoot = syncRoot;
@@ -134,18 +133,17 @@ public final class DenseStorageWriter {
 
     /** Call this method to indicate when you are finished writing to the queue. */
     public void finish() {
-        flush(true);
+        addControlWord(DenseStorageConstants.END_OF_STREAM_SENTINEL);
+        flush();
     }
 
     private void addControlWord(int controlWord) {
-        if (controlCurrent == controlBuffer.length) {
-            flush(false);
-            controlBuffer = new int[DenseStorageConstants.CONTROL_QUEUE_SIZE];
-            controlBegin = 0;
-            controlCurrent = 0;
-        }
-        controlBuffer[controlCurrent] = controlWord;
-        ++controlCurrent;
+        final byte[] data = controlWordByteSlice.data();
+        data[0] = (byte)controlWord;
+        data[1] = (byte)(controlWord >>> 8);
+        data[2] = (byte)(controlWord >>> 16);
+        data[3] = (byte)(controlWord >>> 24);
+        addBytes(controlWordByteSlice);
     }
 
     private void addBytes(ByteSlice bs) {
@@ -156,7 +154,7 @@ public final class DenseStorageWriter {
         assert sliceSize <= DenseStorageConstants.PACKED_QUEUE_SIZE;
 
         if (packedCurrent + sliceSize > packedBuffer.length) {
-            flush(false);
+            flush();
             packedBuffer = new byte[DenseStorageConstants.PACKED_QUEUE_SIZE];
             packedBegin = 0;
             packedCurrent = 0;
@@ -167,7 +165,7 @@ public final class DenseStorageWriter {
 
     private void addLargeArray(byte[] largeArray) {
         if (largeArrayCurrent == largeArrayBuffer.length) {
-            flush(false);
+            flush();
             largeArrayBuffer = new byte[DenseStorageConstants.LARGE_ARRAY_QUEUE_SIZE][];
             largeArrayBegin = 0;
             largeArrayCurrent = 0;
@@ -176,40 +174,21 @@ public final class DenseStorageWriter {
         ++largeArrayCurrent;
     }
 
-    private void flush(boolean isLast) {
+    private void flush() {
         // This new node now owns the following slices (these are half-open intervals)
-        // controlBuffer[controlBegin...controlCurrent)
         // packedBuffer[packedBegin...packedCurrent)
         // largeArrayBuffer[largeArrayBegin...largeArrayCurrent)
-        final QueueNode newNode = new QueueNode(controlBuffer, controlBegin, controlCurrent,
+        final QueueNode newNode = new QueueNode(
                 packedBuffer, packedBegin, packedCurrent,
                 largeArrayBuffer, largeArrayBegin, largeArrayCurrent);
 
         // DenseStorageWriter now owns suffix of the buffers after what the QueueNode owns.
-        // controlBuffer[controlCurrent...end)
         // packedBuffer[packedCurrent...end)
         // largeArrayBuffer[largeArrayCurrent...end)
-        controlBegin = controlCurrent;
         packedBegin = packedCurrent;
         largeArrayBegin = largeArrayCurrent;
 
         appendNode(newNode);
-
-        if (!isLast) {
-            return;
-        }
-        // hygeine
-        controlBuffer = null;
-        controlBegin = 0;
-        controlCurrent = 0;
-        packedBuffer = null;
-        packedBegin = 0;
-        packedCurrent = 0;
-        largeArrayBuffer = null;
-        largeArrayBegin = 0;
-        largeArrayCurrent = 0;
-
-        appendNode(QueueNode.END_OF_STREAM_SENTINEL);
     }
 
     private void appendNode(QueueNode newNode) {

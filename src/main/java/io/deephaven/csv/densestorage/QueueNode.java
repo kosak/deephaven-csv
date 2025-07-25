@@ -6,16 +6,6 @@ package io.deephaven.csv.densestorage;
  * is managed by the {@link DenseStorageWriter} and {@link DenseStorageReader}.
  */
 public final class QueueNode {
-    public static final QueueNode END_OF_STREAM_SENTINEL = new QueueNode(null, 0, 0,
-            null, 0, 0, null, 0, 0);
-    /**
-     * We are a reader of 'controlBuffer' in the half-open interval [controlBegin, controlEnd) and the
-     * rest of the code promises not to touch those values.
-     */
-    public final int[] controlBuffer;
-    public final int controlBegin;
-    public final int controlEnd;
-
     /**
      * We are a reader of 'packedBuffer' in the half-open interval [packedBegin, packedEnd) and the
      * rest of the code promises not to touch those values.
@@ -43,10 +33,7 @@ public final class QueueNode {
     /**
      * Constructor. Sets this queue node to represent the passed-in slices.
      */
-    public QueueNode(int[] controlBuffer, int controlBegin, int controlEnd, byte[] packedBuffer, int packedBegin, int packedEnd, byte[][] largeArryBuffer, int largeArrayBegin, int largeArrayEnd) {
-        this.controlBuffer = controlBuffer;
-        this.controlBegin = controlBegin;
-        this.controlEnd = controlEnd;
+    public QueueNode(byte[] packedBuffer, int packedBegin, int packedEnd, byte[][] largeArryBuffer, int largeArrayBegin, int largeArrayEnd) {
         this.packedBuffer = packedBuffer;
         this.packedBegin = packedBegin;
         this.packedEnd = packedEnd;

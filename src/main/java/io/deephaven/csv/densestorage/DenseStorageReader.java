@@ -12,10 +12,6 @@ public final class DenseStorageReader {
     private final Semaphore semaphore;
     private QueueNode tail;
 
-    private int[] controlBuffer = null;
-    private int controlCurrent = 0;
-    private int controlEnd = 0;
-
     private byte[] packedBuffer = null;
     private int packedCurrent = 0;
     private int packedEnd = 0;
@@ -39,9 +35,6 @@ public final class DenseStorageReader {
         this.syncRoot = other.syncRoot;
         this.semaphore = other.semaphore;
         this.tail = other.tail;
-        this.controlBuffer = other.controlBuffer;
-        this.controlCurrent = other.controlCurrent;
-        this.controlEnd = other.controlEnd;
         this.packedBuffer = other.packedBuffer;
         this.packedCurrent = other.packedCurrent;
         this.packedEnd = other.packedEnd;
@@ -61,7 +54,7 @@ public final class DenseStorageReader {
      * @return true if there is more data, and the ByteSlice has been populated. Otherwise, false.
      */
     public boolean tryGetNextSlice(final ByteSlice bs) throws CsvReaderException {
-        final int control = tryGetControlWord();
+        final int control = getControlWord(bs);
         if (control == DenseStorageConstants.END_OF_STREAM_SENTINEL) {
             return false;
         }
@@ -73,20 +66,19 @@ public final class DenseStorageReader {
         return true;
     }
 
-    private int tryGetControlWord() throws CsvReaderException {
-        while (controlCurrent == controlEnd) {
-            if (!tryRefill()) {
-                return DenseStorageConstants.END_OF_STREAM_SENTINEL;
-            }
-        }
-        return controlBuffer[controlCurrent++];
+    private int getControlWord(ByteSlice bs) throws CsvReaderException {
+        getSliceFromPackedArray(bs, 4);
+        final byte[] data = bs.data();
+        final int begin = bs.begin();
+        return (data[begin] & 0xff) |
+                ((data[begin + 1] & 0xff) << 8) |
+                ((data[begin + 2] & 0xff) << 16) |
+                ((data[begin + 3] & 0xff) << 24);
     }
 
     private void getSliceFromLargeArray(ByteSlice bs) throws CsvReaderException {
         while (largeArrayCurrent == largeArrayEnd) {
-            if (!tryRefill()) {
-                throw new CsvReaderException("Premature end of large array stream");
-            }
+            refill();
         }
         byte[] slice = largeArrayBuffer[largeArrayCurrent++];
         bs.reset(slice, 0, slice.length);
@@ -96,15 +88,13 @@ public final class DenseStorageReader {
         if (sizeNeeded == 0) {
             // If requested size is 0, then no bytes need to be pulled from the queue.
             // In fact, trying to pull 0 bytes might trigger a premature move to the next
-            // node, which we don't want.
+            // node, which we don't want. Just return an empty slice.
             bs.reset(packedBuffer, packedCurrent, packedCurrent);
             return;
         }
 
         while (packedCurrent == packedEnd) {
-            if (!tryRefill()) {
-                throw new CsvReaderException("Premature end of packed array stream");
-            }
+            refill();
         }
         if (packedCurrent + sizeNeeded > packedEnd) {
             int availableSize = packedEnd - packedCurrent;
@@ -117,15 +107,9 @@ public final class DenseStorageReader {
         packedCurrent = packedEnd;
     }
 
-    private boolean tryRefill() throws CsvReaderException {
-        if (controlCurrent != controlEnd ||
-                packedCurrent != packedEnd ||
-                largeArrayCurrent != largeArrayEnd) {
-            throw new CsvReaderException("Assertion failure: discarding unread data");
-        }
-
-        if (tail == QueueNode.END_OF_STREAM_SENTINEL) {
-            return false;
+    private void refill() throws CsvReaderException {
+        if (packedCurrent != packedEnd || largeArrayCurrent != largeArrayEnd) {
+            throw new CsvReaderException("Assertion failure: refill() discarding unread data");
         }
 
         boolean needsRelease;
@@ -137,6 +121,7 @@ public final class DenseStorageReader {
                     throw new RuntimeException("Thread interrupted", ie);
                 }
             }
+
             needsRelease = !tail.appendHasBeenObserved;
             tail.appendHasBeenObserved = true;
             tail = tail.next;
@@ -145,10 +130,6 @@ public final class DenseStorageReader {
             semaphore.release();
         }
 
-        controlBuffer = tail.controlBuffer;
-        controlCurrent = tail.controlBegin;
-        controlEnd = tail.controlEnd;
-
         packedBuffer = tail.packedBuffer;
         packedCurrent = tail.packedBegin;
         packedEnd = tail.packedEnd;
@@ -156,7 +137,5 @@ public final class DenseStorageReader {
         largeArrayBuffer = tail.largeArryBuffer;
         largeArrayCurrent = tail.largeArrayBegin;
         largeArrayEnd = tail.largeArrayEnd;;
-
-        return tail != QueueNode.END_OF_STREAM_SENTINEL;
     }
 }
