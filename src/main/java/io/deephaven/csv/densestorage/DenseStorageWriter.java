@@ -1,10 +1,8 @@
 package io.deephaven.csv.densestorage;
 
 import io.deephaven.csv.containers.ByteSlice;
-import io.deephaven.csv.util.MutableObject;
 import io.deephaven.csv.util.Pair;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.Semaphore;
 
 /**
