@@ -19,8 +19,8 @@ public class DenseStorageConstants {
      */
     public static final int PACKED_QUEUE_SIZE = LARGE_THRESHOLD * 1024;
     /**
-     * Size of the "large array queue". Somewhat arbitrary but should be large-ish. We have arbitrarily chosen 100K here. 10K
-     * might also be reasonable.
+     * Size of the "large array queue". Somewhat arbitrary but should be large-ish. We have arbitrarily chosen 100K
+     * here. 10K might also be reasonable.
      */
     public static final int LARGE_ARRAY_QUEUE_SIZE = 100_000;
     /**

@@ -137,10 +137,10 @@ public final class DenseStorageWriter {
 
     private void addControlWord(int controlWord) {
         final byte[] data = controlWordByteSlice.data();
-        data[0] = (byte)controlWord;
-        data[1] = (byte)(controlWord >>> 8);
-        data[2] = (byte)(controlWord >>> 16);
-        data[3] = (byte)(controlWord >>> 24);
+        data[0] = (byte) controlWord;
+        data[1] = (byte) (controlWord >>> 8);
+        data[2] = (byte) (controlWord >>> 16);
+        data[3] = (byte) (controlWord >>> 24);
         addBytes(controlWordByteSlice);
     }
 

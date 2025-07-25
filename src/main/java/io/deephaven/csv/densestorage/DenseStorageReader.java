@@ -29,6 +29,7 @@ public final class DenseStorageReader {
 
     /**
      * Constructor that copies the state of 'other'.
+     * 
      * @param other The other object
      */
     private DenseStorageReader(DenseStorageReader other) {
@@ -48,8 +49,9 @@ public final class DenseStorageReader {
     }
 
     /**
-     * Tries to get the next slice from the queue. Uses data in the 'control' queue to figure out
-     * which data queue ('packed' or 'largeArray') the next slice is coming from.
+     * Tries to get the next slice from the queue. Uses data in the 'control' queue to figure out which data queue
+     * ('packed' or 'largeArray') the next slice is coming from.
+     * 
      * @param bs If the method returns true, the contents of this parameter will be updated.
      * @return true if there is more data, and the ByteSlice has been populated. Otherwise, false.
      */
@@ -100,7 +102,8 @@ public final class DenseStorageReader {
             int availableSize = packedEnd - packedCurrent;
             throw new CsvReaderException(
                     String.format(
-                            "Assertion failure: got short block: expected at least %d, got %d", sizeNeeded, availableSize));
+                            "Assertion failure: got short block: expected at least %d, got %d", sizeNeeded,
+                            availableSize));
         }
         final int packedEnd = packedCurrent + sizeNeeded;
         bs.reset(packedBuffer, packedCurrent, packedEnd);
