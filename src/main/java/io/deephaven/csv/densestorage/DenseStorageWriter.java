@@ -15,7 +15,7 @@ import java.util.concurrent.Semaphore;
  * inferencer can take a second "pass" over the same input data.
  *
  * <p>
- * The point of this object is to store a sequence of (character sequences aka "strings", but not java.lang.String),
+ * The point of this object is to store a sequence of (UTF-8 character sequences represented as bytes),
  * using a small fraction of overhead. The problem with storing every character sequence as a java.lang.String is:
  *
  * <ol>
@@ -59,25 +59,31 @@ import java.util.concurrent.Semaphore;
  * data, not the whole file.
  *
  * <p>
- * The implementation used here is to look at the "string" being added to the writer and categorize it along two
- * dimensions:
+ * The implementation used here is to look at the string being added to the writer and determine whether it is
+ * "small" or "large".
+ * <p>
+ * Small byte strings are packed into a byte block which will contain many such small strings, and we maintain a linked
+ * list of these byte blocks. Large byte strings are not packed but rather copied to their own byte[] array, then a reference
+ * to that array is added to a byte-array block. (And again, we maintain a linked list of these byte-array blocks).
+ * We do not want large strings to contaminate our packed byte blocks because they would not likely pack into them tightly.
+ *
+ * Logically this class manages two queues: the "packed" queue and the "large array" queue.
+ * The "packed" queue contains control words and bytes for small strings. The "large array" queue contains byte[]
+ * arrays for large strings.
+ *
+ * These are the various write operations:
  *
  * <ul>
- * <li>Small vs large
- * <li>Byte vs char
+ * <li>Write a small string: The length (4 bytes, nonnegative) is written to the packed queue, and then the UTF-8 bytes of the string.</li>
+ * <li>Write a large string: A special sentinel value (4 bytes with value DenseStorageConstants.LARGE_BYTE_ARRAY_SENTINEL) is written to the packed queue,
+ * and then the byte[] reference is appended to the large array queue.</li>
+ * <li>End of input: A special sentinel value (4 bytes,  with value DenseStorageConstants.END_OF_STREAM_SENTINEL) is written to the packed queue.</li>
  * </ul>
  *
- * These dimensions are broken out in the following way:
- * <ul>
- * <li>Small byte "strings" are packed into a byte block, and we maintain a linked list of these byte blocks.
- * <li>"Large" byte "strings" are stored directly, meaning a byte[] array is allocated for their data, then a reference
- * to that array is added to a byte-array block. (And again, we maintain a linked list of these byte-array blocks). It
- * is not typical for CSV data to contain a cell this large, but the feature is there for completeness. We do not want
- * want large "strings" to contaminate our packed byte blocks because they would not likely pack into them tightly (it
- * would become more likely to have allocated blocks with unused storage at the end, because the last big string
- * wouldn't fit in the current block). It's OK to keep them on their own because by definition, large "strings" are not
- * going to have much overhead, as a percentage of the size of their text content.
- * </ul>
+ * One issue is that the storage array underlying the queues may fill at different rates, but when we flush we still need to notify the reader of the current state of both queues,
+ * even if the underlying arrays are only partially written. To solve this, we send slices from writer to reader via the QueueNode. Put another way, the flush() operation will create
+ * a QueueNode having a slice representing all the packed bytes since the last flush, and a slice representing all the large array references since the last flush. Thus multiple
+ * QueueNodes may refer to the same underlying buffers, but they will be different slices of those buffers.
  */
 public final class DenseStorageWriter {
     /** Constructor */

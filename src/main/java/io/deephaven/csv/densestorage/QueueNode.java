@@ -7,16 +7,16 @@ package io.deephaven.csv.densestorage;
  */
 public final class QueueNode {
     /**
-     * We are a reader of 'packedBuffer' in the half-open interval [packedBegin, packedEnd) and the rest of the code
-     * promises not to touch those values.
+     * Represents packed bytes from 'packedBuffer' in the half-open interval [packedBegin, packedEnd). It is the contract
+     * of the code that bytes in this interval are immutable.
      */
     public final byte[] packedBuffer;
     public final int packedBegin;
     public final int packedEnd;
 
     /**
-     * We are a reader of 'largeArrayBuffer' in the half-open interval [largeArrayBegin, largeArrayEnd) and the rest of
-     * the code promises not to change the values in that interval.
+     * Represents byte[] references from 'largeArrayBuffer' in the half-open interval [largeArrayBegin, largeArrayEnd). It is the contract
+     * of the code that the references in this interval (and the underlying bytes they point to) are immutable.
      */
     public final byte[][] largeArryBuffer;
     public final int largeArrayBegin;
@@ -26,6 +26,7 @@ public final class QueueNode {
 
     /**
      * Whether at least one reader has observed the {@link QueueNode#next} field transitioning from null to non-null.
+     * This is used for flow control, so the writer doesn't get too far ahead of the reader.
      */
     public boolean appendHasBeenObserved = false;
 
