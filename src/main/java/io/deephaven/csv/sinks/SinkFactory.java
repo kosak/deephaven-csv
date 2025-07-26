@@ -299,6 +299,7 @@ public interface SinkFactory {
     /**
      * Factory method for simple array sinks. This is useful if you are coding up something quickly and just want a
      * sensible data structure.
+     * @return The factory for simple array sinks.
      */
     static SinkFactory arrays() {
         return new ArraySinkFactory(null, null, null, null, null, null, null, null, null, null, null);
@@ -306,6 +307,7 @@ public interface SinkFactory {
 
     /**
      * Variant of {@link SinkFactory#arrays} that allows you to specify null sentinel values.
+     * @return The factory for simple array sinks with the specified null sentinels.
      */
     static SinkFactory arrays(Byte byteSentinel, Short shortSentinel,
             Integer intSentinel,
@@ -335,10 +337,13 @@ public interface SinkFactory {
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
      * @param source The optional Source that can be used to read back the data for faster type inference.
+     * @return The constructed Sink object
      **/
     Sink<byte[]> forByte(int colNum, MutableObject<Source<byte[]>> source);
 
-    /** The optional reserved value for the byte representation. */
+    /** The optional reserved value for the byte representation.
+     * @return The optional reserved value.
+     */
     Byte reservedByte();
 
     /**
@@ -346,10 +351,13 @@ public interface SinkFactory {
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
      * @param source The optional Source that can be used to read back the data for faster type inference.
+     * @return The constructed Sink object
      **/
     Sink<short[]> forShort(int colNum, MutableObject<Source<short[]>> source);
 
-    /** The optional reserved value for the short representation. */
+    /** The optional reserved value for the short representation.
+     * @return The optional reserved value.
+     */
     Short reservedShort();
 
     /**
@@ -357,10 +365,13 @@ public interface SinkFactory {
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
      * @param source The optional Source that can be used to read back the data for faster type inference.
+     * @return The constructed Sink object
      **/
     Sink<int[]> forInt(int colNum, MutableObject<Source<int[]>> source);
 
-    /** The optional reserved value for the int representation. */
+    /** The optional reserved value for the int representation.
+     * @return The optional reserved value.
+     */
     Integer reservedInt();
 
     /**
@@ -368,36 +379,46 @@ public interface SinkFactory {
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
      * @param source The optional Source that can be used to read back the data for faster type inference.
+     * @return The constructed Sink object
      **/
     Sink<long[]> forLong(int colNum, MutableObject<Source<long[]>> source);
 
-    /** The optional reserved value for the long representation. */
+    /** The optional reserved value for the long representation.
+     * @return The optional reserved value.
+     */
     Long reservedLong();
 
     /**
      * Provide a Sink for the float representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<float[]> forFloat(int colNum);
 
-    /** The optional reserved value for the float representation. */
+    /** The optional reserved value for the float representation.
+     * @return The optional reserved value.
+     */
     Float reservedFloat();
 
     /**
      * Provide a Sink for the double representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<double[]> forDouble(int colNum);
 
-    /** The optional reserved value for the double representation. */
+    /** The optional reserved value for the double representation.
+     * @return The optional reserved value.
+     */
     Double reservedDouble();
 
     /**
      * Provide a Sink for the booelan as byte representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<byte[]> forBooleanAsByte(int colNum);
 
@@ -407,43 +428,54 @@ public interface SinkFactory {
      * Provide a Sink for the char representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<char[]> forChar(int colNum);
 
-    /** The optional reserved value for the char representation. */
+    /** The optional reserved value for the char representation.
+     * @return The optional reserved value.
+     */
     Character reservedChar();
 
     /**
      * Provide a Sink for the String representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<String[]> forString(int colNum);
 
-    /** The optional reserved value for the String representation. */
+    /** The optional reserved value for the String representation.
+     * @return The optional reserved value.
+     */
     String reservedString();
 
     /**
      * Provide a Sink for the datetime as long representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<long[]> forDateTimeAsLong(int colNum);
 
-    /** The optional reserved value for the DateTime (as long) representation. */
+    /** The optional reserved value for the DateTime (as long) representation.
+     * @return The optional reserved value.
+     */
     Long reservedDateTimeAsLong();
 
     /**
      * Provide a Sink for the Timestamp (as long) representation.
      * 
      * @param colNum The (zero-based) column number that this Sink will be used for.
+     * @return The constructed Sink object
      **/
     Sink<long[]> forTimestampAsLong(int colNum);
 
-    /** The optional reserved value for the Timestamp (as long) representation. */
+    /** The optional reserved value for the Timestamp (as long) representation.
+     * @return The optional reserved value.
+     */
     Long reservedTimestampAsLong();
 }
-
 
 abstract class SinkFactoryImplBase<TFLOATSINK extends Sink<float[]>, TDOUBLESINK extends Sink<double[]>, TBOOLASBYTESINK extends Sink<byte[]>, TCHARSINK extends Sink<char[]>, TSTRINGSINK extends Sink<String[]>, TDATETIMEASLONGSINK extends Sink<long[]>, TTIMESTAMPASLONGSINK extends Sink<long[]>>
         implements SinkFactory {
