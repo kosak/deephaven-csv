@@ -38,10 +38,32 @@ public interface SinkFactory {
      * requires the factory implementor to do a little more work, because they have to implement the Source&lt;T&gt;
      * interface for byte[], short[], int, and long[]. If the factory implementor does not want to do this work (or the
      * target data structure does not support reading back), the caller can invoke {@link SinkFactory#ofSimple} instead.
-     *
+     * <p>
      * As a service to the caller, we also make the provided {@link SinkFactory} threadsafe by synchronizing all the
      * forXXX methods. This is probably not necessary for most suppliers but we do it in order to provide an extra level
      * of protection.
+     * @param <TBYTESINK> The type of the byteSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;byte[]&gt; and Source&lt;byte[]&gt;
+     * @param <TSHORTSINK> The type of the shortSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;short[]&gt; and Source&lt;short[]&gt;
+     * @param <TINTSINK> The type of the intSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;int[]&gt; and Source&lt;int[]&gt;
+     * @param <TLONGSINK> The type of the longSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;long[]&gt; and Source&lt;long[]&gt;
+     * @param <TFLOATSINK> The type of the floatSinkSupplier. Extends Sink&lt;float[]&gt;
+     * @param <TDOUBLESINK> The type of the doubleSinkSupplier. Extends Sink&lt;double[]&gt;
+     * @param <TBOOLASBYTESINK> The type of the boolAsByteSinkSupplier. Because the raw type is byte, extends Sink&lt;byte[]&gt;, not Sink&lt;bool[]&gt;
+     * @param <TCHARSINK> The type of the charSinkSupplier. Extends Sink&lt;char[]&gt;
+     * @param <TSTRINGSINK> The type of the charSinkSupplier. Extends Sink&lt;String[]&gt;
+     * @param <TDATETIMEASLONGSINK> The type of the dateTimeAsLongSinkSupplier. Because the raw type is long, extends Sink&lt;long[]&gt;
+     * @param <TTIMESTAMPASLONGSINK> The type of the timestampAsLongSinkSupplier. Because the raw type is long, extends Sink&lt;long[]&gt;
+     * @param byteSinkSupplier An object implementing both the Sink&lt;byte[]&gt; and Source&lt;byte[]&gt; interfaces
+     * @param shortSinkSupplier An object implementing both the Sink&lt;short[]&gt; and Source&lt;short[]&gt; interfaces
+     * @param intSinkSupplier An object implementing both the Sink&lt;int[]&gt; and Source&lt;int[]&gt; interfaces
+     * @param longSinkSupplier An object implementing both the Sink&lt;long[]&gt; and Source&lt;long[]&gt; interfaces
+     * @param floatSinkSupplier An object implementing the Sink&lt;float[]&gt; interface
+     * @param doubleSinkSupplier An object implementing the Sink&lt;double[]&gt; interface
+     * @param booleanAsByteSinkSupplier An object implementing the Sink&lt;byte[]&gt; interface
+     * @param charSinkSupplier An object implementing the Sink&lt;char[]&gt; interface
+     * @param stringSinkSupplier An object implementing the Sink&lt;String[]&gt; interface
+     * @param dateTimeAsLongSinkSupplier An object implementing the Sink&lt;long[]&gt; interface
+     * @param timestampAsLongSinkSupplier An object implementing the Sink&lt;long[]&gt; interface
      */
     static <TBYTESINK extends Sink<byte[]> & Source<byte[]>, TSHORTSINK extends Sink<short[]> & Source<short[]>, TINTSINK extends Sink<int[]> & Source<int[]>, TLONGSINK extends Sink<long[]> & Source<long[]>, TFLOATSINK extends Sink<float[]>, TDOUBLESINK extends Sink<double[]>, TBOOLASBYTESINK extends Sink<byte[]>, TCHARSINK extends Sink<char[]>, TSTRINGSINK extends Sink<String[]>, TDATETIMEASLONGSINK extends Sink<long[]>, TTIMESTAMPASLONGSINK extends Sink<long[]>> SinkFactory of(
             IntFunction<TBYTESINK> byteSinkSupplier,
