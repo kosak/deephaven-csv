@@ -6,84 +6,92 @@ import io.deephaven.csv.util.Pair;
 import java.util.concurrent.Semaphore;
 
 /**
- * The DenseStorageWriter and {@link DenseStorageReader} work in tandem, forming a FIFO queue. The DenseStorageWriter
+ * The {@link DenseStorageWriter} and {@link DenseStorageReader} work in tandem, forming a FIFO queue. The {@link DenseStorageWriter}
  * writes data, and the {@link DenseStorageReader} reads that data. If the {@link DenseStorageReader} "catches up", it
  * will block until the DenseStorageWriter provides more data, or indicates that it is done (via the {@link #finish()}
- * method. This synchronization is done at "block" granularity, so the DenseStorageReader can only proceed when the
- * DenseStorageWriter has written at least a "block" of data or is done. We allow multiple independent
- * {@link DenseStorageReader}s to consume the same underlying data. In our implementation this is used so our type
- * inferencer can take a second "pass" over the same input data.
+ * method. This synchronization is done at block granularity, so the DenseStorageReader can only proceed when the
+ * DenseStorageWriter has written at least a block of data or is finished. We allow multiple independent
+ * {@link DenseStorageReader}s to consume the same underlying data. In our implementation this is used if our type
+ * inferencer needs to take a second pass over the input data.
  *
  * <p>
  * The point of this object is to store a sequence of (UTF-8 character sequences represented as bytes),
- * using a small fraction of overhead. The problem with storing every character sequence as a java.lang.String is:
+ * with less overhead than there would be if we just passed arrays of java.lang.String. The problem with storing every character sequence as a java.lang.String is:
  *
  * <ol>
  * <li>Per-object overhead (probably 8 or 16 bytes depending on pointer width)
  * <li>The memory cost of holding a reference to that String (again 4 or 8 bytes)
  * <li>The string has to know its length (4 bytes)
- * <li>Java characters are 2 bytes even though in practice many strings are ASCII-only and their chars can fit in a
+ * <li>Java characters are 2 bytes even though in practice many strings in our use case are ASCII-only and their chars can fit in a
  * byte. (Newer Java implementations can store text as bytes, eliminating this objection)
  * </ol>
  *
  * <p>
- * For small strings (say the word "hello" or the input text "12345.6789") the overhead can be 100% or worse.
+ * For small strings (e.g. the word "Price" or the input text "12345.6789") the overhead can be 100% or worse.
  *
  * <p>
- * For our purposes we:
+ * Our use case is special in that we only need sequential access. i.e. we don't need random access into the sequence of strings. So we can support a
+ * model where we can have a forward-only cursor moving over the sequence of strings. We also don't need to give our caller a data structure that they can hold on to. The caller only gets a view (a slice)
+ * of the current string data. The view is invalidated when they move to the next string. Both of these considerations allow us to store
+ * strings as a packed array of UTF-8 bytes.
+ *
+ * Communication between the {@link DenseStorageWriter} and {@link DenseStorageReader} is done via a simple linked list
+ * of immutable data. This gives us the following properties.
  *
  * <ol>
- * <li>Only need sequential access. i.e. we don't need random access into the sequence of "strings". So we can support a
- * model where we can have a forward-only cursor moving over the sequence of "strings".
- * <li>Don't need to give our caller a data structure that they can hold on to. The caller only gets a "view" (a slice)
- * of the current "string" data. The view is invalidated when they move to the next "string"
- * </ol>
- *
- * Furthermore we:
- *
- * <ol>
- * <li>Offer a FIFO model where the reader (in a separate thread) can chase the writer but there is not an inordinate
- * amount of synchronization overhead (synchronization happens at the block level, not the "string" level).
- * <li>Have the ability to make multiple Readers which pass over the same underlying data. This is our low-drama way of
- * allowing our client to make multiple passes over the data, without complicating the iteration interface, with, e.g.,
- * a reset method.
- * <li>Use a linked-list structure so that when all existing readers have move passed a block of data, that block can be
- * freed by the garbage collector without any explicit action taken by the reader.
+ * <li>A FIFO model where the reader (in a separate thread) can chase the writer but there is not an inordinate
+ * amount of synchronization overhead (synchronization happens at the linked list node level, not the string level).
+ * <li>Multiple Readers can pass over the same underlying data if necessary, e.g. for type inference.
+ * <li>The linked-list structure permits the garbage collector to free nodes after a block has been processed
+ * (assuming the data does not need to be kept around for a second type inference phase).
  * </ol>
  *
  * If you are familiar with the structure of our inference, you may initially think that this reader-chasing-writer
- * garbage collection trick doesn't buy us much because we have a two-phase parser. However, when the inferencer has
- * gotten to the last parser in its set of allowable parsers (say, the String parser), or the user has specified that
- * there is only one parser for this column, then the code doesn't need to do any inference and can parse the column in
- * one pass. In this case, when the reader stays caught up with the writer, we are basically just buffering one block of
- * data, not the whole file.
+ * garbage collection trick doesn't buy us much because we have a two-phase parser. However it is helpful in at least
+ * two cases:
+ * <ol>
+ * <li>when the inferencer has gotten to the last parser in its set of allowable parsers (typically the String parser,
+ * or when the caller has specified a specific parser), the code recognizes there can be second phase. In this case
+ * the reader generally stays caught up with the reader and blocks are freed as they are consumed.</li>
+ * </ol>
  *
  * <p>
- * The implementation used here is to look at the string being added to the writer and determine whether it is
- * "small" or "large".
- * <p>
- * Small byte strings are packed into a byte block which will contain many such small strings, and we maintain a linked
- * list of these byte blocks. Large byte strings are not packed but rather copied to their own byte[] array, then a reference
- * to that array is added to a byte-array block. (And again, we maintain a linked list of these byte-array blocks).
- * We do not want large strings to contaminate our packed byte blocks because they would not likely pack into them tightly.
+ * Logically, the implementation manages two queues: a "packed" queue used to pack control words, and the UTF-8 bytes for strings
+ * whose length is up to a certain threshold, and a "large array" queue used to hold individual byte[] references to
+ * the UTF-8 representation of large strings. We do not attempt to pack large strings into our packed queue
+ * because they would not likely pack into them tightly. Since these strings are large by definition, we are not
+ * concerned about the overhead of storing them separately.
  *
- * Logically this class manages two queues: the "packed" queue and the "large array" queue.
- * The "packed" queue contains control words and bytes for small strings. The "large array" queue contains byte[]
- * arrays for large strings.
- *
- * These are the various write operations:
+ * <p>These are the various write operations:
  *
  * <ul>
- * <li>Write a small string: The length (4 bytes, nonnegative) is written to the packed queue, and then the UTF-8 bytes of the string.</li>
+ * <li>Write a small string: The length (4 bytes, nonnegative) is written to the packed queue, and then the UTF-8 bytes of the string are written.</li>
  * <li>Write a large string: A special sentinel value (4 bytes with value DenseStorageConstants.LARGE_BYTE_ARRAY_SENTINEL) is written to the packed queue,
- * and then the byte[] reference is appended to the large array queue.</li>
- * <li>End of input: A special sentinel value (4 bytes,  with value DenseStorageConstants.END_OF_STREAM_SENTINEL) is written to the packed queue.</li>
+ * and then the byte[] reference holding the UTF-8 encoding of the string is appended to the large array queue.</li>
+ * <li>End of input: A special sentinel value (4 bytes, with value DenseStorageConstants.END_OF_STREAM_SENTINEL) is written to the packed queue.</li>
  * </ul>
  *
- * One issue is that the storage array underlying the queues may fill at different rates, but when we flush we still need to notify the reader of the current state of both queues,
- * even if the underlying arrays are only partially written. To solve this, we send slices from writer to reader via the QueueNode. Put another way, the flush() operation will create
- * a QueueNode having a slice representing all the packed bytes since the last flush, and a slice representing all the large array references since the last flush. Thus multiple
- * QueueNodes may refer to the same underlying buffers, but they will be different slices of those buffers.
+ * The two queues are backed by Java arrays (of type byte[] and byte[][] respectively). These storage arrays typically
+ * fill at different rates. To accommodate this while still using storage efficiently, the {@link DenseStorageWriter} and {@link DenseStorageReader}
+ * keep track of the slice of the buffer that they are allowed to write to, or allowed to read from, respectively.
+ * For example if the packed buffer fills up but the large array doesn't, the {@link DenseStorageWriter} will
+ * create a {@link QueueNode} representing a slice of the whole packed buffer, but only the filled part of the large array.
+ * Then the {@link DenseStorageWriter} will allocate a new packed buffer, starting to fill it from the beginning,
+ * but it will continue to fill the large array from where it left off.
+ *
+ * <p>
+ * Put another way, the {@link DenseStorageWriter#packedBuffer} can be considered to be split into multiple regions of interest.
+ * The bytes in the half-open interval [0, {@link DenseStorageWriter#packedBegin}) have all been given away to the
+ * {@link DenseStorageReader}, via the {@link QueueNode}, in one or multiple slices, and must not be touched further.
+ * On the other hand the bytes in the half-open interval [{@link DenseStorageWriter#packedBegin}, packedBuffer.length)
+ * are private to the {@link DenseStorageWriter}, and can be modified at will.
+ * The variable {@link DenseStorageWriter#packedCurrent}
+ * is an index to the next byte that the {@link DenseStorageWriter} plans to write to.
+ * When {@link DenseStorageWriter#packedCurrent} becomes equal to packedBuffer.length, then the buffer is full. In this case
+ * it will be flushed to a {@link QueueNode} and a fresh buffer will be allocated,
+ * with {@link DenseStorageWriter#packedBegin} and {@link DenseStorageWriter#packedCurrent} set to 0.
+ *
+ * <p>The buffer {@link DenseStorageWriter#largeArrayBuffer} follows the same rules as the above.
  */
 public final class DenseStorageWriter {
     /** Constructor */
