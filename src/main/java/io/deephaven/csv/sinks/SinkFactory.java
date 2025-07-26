@@ -307,6 +307,17 @@ public interface SinkFactory {
 
     /**
      * Variant of {@link SinkFactory#arrays} that allows you to specify null sentinel values.
+     * @param byteSentinel If not null, a value that will be stored in your byte[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param shortSentinel If not null, a value that will be stored in your short[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param intSentinel If not null, a value that will be stored in your int[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param longSentinel If not null, a value that will be stored in your long[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param floatSentinel If not null, a value that will be stored in your float[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param doubleSentinel If not null, a value that will be stored in your double[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param booleanAsByteSentinel If not null, a value that will be stored in your byte[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param charSentinel If not null, a value that will be stored in your char[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param stringSentinel A String value that will be stored in your String[] array to represent null. Can be null.
+     * @param dateTimeAsLongSentinel If not null, a value that will be stored in your char[] array to represent null. If null, then the parser will fail upon encountering null.
+     * @param timestampAsLongSentinel If not null, a value that will be stored in your char[] array to represent null. If null, then the parser will fail upon encountering null.
      * @return The factory for simple array sinks with the specified null sentinels.
      */
     static SinkFactory arrays(Byte byteSentinel, Short shortSentinel,
