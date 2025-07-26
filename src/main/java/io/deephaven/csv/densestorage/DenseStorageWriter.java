@@ -7,16 +7,22 @@ import java.util.concurrent.Semaphore;
 
 /**
  * The {@link DenseStorageWriter} and {@link DenseStorageReader} work in tandem, forming a FIFO queue. The {@link DenseStorageWriter}
- * writes data, and the {@link DenseStorageReader} reads that data. If the {@link DenseStorageReader} "catches up", it
- * will block until the DenseStorageWriter provides more data, or indicates that it is done (via the {@link #finish()}
- * method. This synchronization is done at block granularity, so the DenseStorageReader can only proceed when the
+ * writes data, and the {@link DenseStorageReader} reads that data.
+ * If the {@link DenseStorageReader} "catches up", it
+ * will block until the {@link DenseStorageWriter} provides more data, or indicates that it is done (via the {@link #finish()}
+ * method. On the other hand, if the {@link DenseStorageReader} falls behind (by a number of blocks defined by
+ * {@link DenseStorageConstants#MAX_UNOBSERVED_BLOCKS}), the {@link DenseStorageWriter} will block until the
+ * {@link DenseStorageReader} starts to catch up again.
+ *
+ * <p>
+ * This synchronization is done at block granularity, so the DenseStorageReader can only proceed when the
  * DenseStorageWriter has written at least a block of data or is finished. We allow multiple independent
- * {@link DenseStorageReader}s to consume the same underlying data. In our implementation this is used if our type
- * inferencer needs to take a second pass over the input data.
+ * {@link DenseStorageReader}s to consume the same underlying data. In our implementation this is used so that
+ * our type inferencer can take a second pass over the input data if it needs to.
  *
  * <p>
  * The point of this object is to store a sequence of (UTF-8 character sequences represented as bytes),
- * with less overhead than there would be if we just passed arrays of java.lang.String. The problem with storing every character sequence as a java.lang.String is:
+ * with less overhead than there would be if we just passed arrays of {@link java.lang.String}. The problem with storing every character sequence as a {@link java.lang.String} is:
  *
  * <ol>
  * <li>Per-object overhead (probably 8 or 16 bytes depending on pointer width)
@@ -35,6 +41,7 @@ import java.util.concurrent.Semaphore;
  * of the current string data. The view is invalidated when they move to the next string. Both of these considerations allow us to store
  * strings as a packed array of UTF-8 bytes.
  *
+ * <p>
  * Communication between the {@link DenseStorageWriter} and {@link DenseStorageReader} is done via a simple linked list
  * of immutable data. This gives us the following properties.
  *
@@ -46,19 +53,19 @@ import java.util.concurrent.Semaphore;
  * (assuming the data does not need to be kept around for a second type inference phase).
  * </ol>
  *
+ * <p>
  * If you are familiar with the structure of our inference, you may initially think that this reader-chasing-writer
- * garbage collection trick doesn't buy us much because we have a two-phase parser. However it is helpful in at least
- * two cases:
- * <ol>
- * <li>when the inferencer has gotten to the last parser in its set of allowable parsers (typically the String parser,
- * or when the caller has specified a specific parser), the code recognizes there can be second phase. In this case
- * the reader generally stays caught up with the reader and blocks are freed as they are consumed.</li>
- * </ol>
+ * garbage collection trick doesn't buy us much because we have a two-phase parser. However, it is helpful in the
+ * following important case.
+ * When the inferencer has gotten to the last parser in its set of allowable parsers (typically the String parser,
+ * or when the caller has specified a specific parser and therefore there is only one parser), the code recognizes that there
+ * is no need for a second phase. In this case
+ * the reader generally stays caught up with the reader and blocks are freed as they are consumed.
  *
  * <p>
- * Logically, the implementation manages two queues: a "packed" queue used to pack control words, and the UTF-8 bytes for strings
- * whose length is up to a certain threshold, and a "large array" queue used to hold individual byte[] references to
- * the UTF-8 representation of large strings. We do not attempt to pack large strings into our packed queue
+ * Logically, the implementation manages two queues: a "packed" queue used to hold control words, and the UTF-8 bytes for strings
+ * whose length is up to a certain threshold; and a "large array" queue used to hold individual byte[] references to
+ * the UTF-8 representation of strings larger than the threshold. We do not attempt to pack large strings into our packed queue
  * because they would not likely pack into them tightly. Since these strings are large by definition, we are not
  * concerned about the overhead of storing them separately.
  *
@@ -71,6 +78,7 @@ import java.util.concurrent.Semaphore;
  * <li>End of input: A special sentinel value (4 bytes, with value DenseStorageConstants.END_OF_STREAM_SENTINEL) is written to the packed queue.</li>
  * </ul>
  *
+ * <p>
  * The two queues are backed by Java arrays (of type byte[] and byte[][] respectively). These storage arrays typically
  * fill at different rates. To accommodate this while still using storage efficiently, the {@link DenseStorageWriter} and {@link DenseStorageReader}
  * keep track of the slice of the buffer that they are allowed to write to, or allowed to read from, respectively.
