@@ -13,7 +13,7 @@ import org.jetbrains.annotations.NotNull;
  * The Parser interface to the CsvReader. This is implemented by all the built-in parsers {@link IntParser},
  * {@link DoubleParser}, etc, as well as user-defined custom parsers.
  *
- * @param <TARRAY>
+ * @param <TARRAY> The underlying type being parsed, represented as an array of that type. e.g. for int, TARRAY would be int[].
  */
 public interface Parser<TARRAY> {
     int CHUNK_SIZE = 65536 * 4;
