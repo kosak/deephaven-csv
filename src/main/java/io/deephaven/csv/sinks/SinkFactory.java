@@ -128,7 +128,6 @@ public interface SinkFactory {
      * @param reservedTimestampAsLong If not null, a sentinel Long value that the caller wishes to exclude from the set of valid timestamps as longs. If such a value is encountered, the parser will fail.
      * @return A SinkFactory configured with the provided suppliers.
      */
-
     static <TBYTESINK extends Sink<byte[]> & Source<byte[]>, TSHORTSINK extends Sink<short[]> & Source<short[]>, TINTSINK extends Sink<int[]> & Source<int[]>, TLONGSINK extends Sink<long[]> & Source<long[]>, TFLOATSINK extends Sink<float[]>, TDOUBLESINK extends Sink<double[]>, TBOOLASBYTESINK extends Sink<byte[]>, TCHARSINK extends Sink<char[]>, TSTRINGSINK extends Sink<String[]>, TDATETIMEASLONGSINK extends Sink<long[]>, TTIMESTAMPASLONGSINK extends Sink<long[]>> SinkFactory of(
             IntFunction<TBYTESINK> byteSinkSupplier,
             Byte reservedByte,
@@ -171,10 +170,33 @@ public interface SinkFactory {
      * data written by narrower numeric parsers (like short). Instead the wider parser needs to reparse the ASCII text.
      * If the factory implementor prefers the more performant version, the caller can invoke {@link SinkFactory#of}
      * instead.
-     *
+     * <p>
      * As a service to the caller, we also make the provided {@link SinkFactory} threadsafe by synchronizing all the
      * forXXX methods. This is probably not necessary for most suppliers but we do it in order to provide an extra level
      * of protection.
+     * @param <TBYTESINK> The type of the byteSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;byte[]&gt; and Source&lt;byte[]&gt;
+     * @param <TSHORTSINK> The type of the shortSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;short[]&gt; and Source&lt;short[]&gt;
+     * @param <TINTSINK> The type of the intSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;int[]&gt; and Source&lt;int[]&gt;
+     * @param <TLONGSINK> The type of the longSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;long[]&gt; and Source&lt;long[]&gt;
+     * @param <TFLOATSINK> The type of the floatSinkSupplier. Extends Sink&lt;float[]&gt;
+     * @param <TDOUBLESINK> The type of the doubleSinkSupplier. Extends Sink&lt;double[]&gt;
+     * @param <TBOOLASBYTESINK> The type of the boolAsByteSinkSupplier. Because the raw type is byte, extends Sink&lt;byte[]&gt;, not Sink&lt;bool[]&gt;
+     * @param <TCHARSINK> The type of the charSinkSupplier. Extends Sink&lt;char[]&gt;
+     * @param <TSTRINGSINK> The type of the charSinkSupplier. Extends Sink&lt;String[]&gt;
+     * @param <TDATETIMEASLONGSINK> The type of the dateTimeAsLongSinkSupplier. Because the raw type is long, extends Sink&lt;long[]&gt;
+     * @param <TTIMESTAMPASLONGSINK> The type of the timestampAsLongSinkSupplier. Because the raw type is long, extends Sink&lt;long[]&gt;
+     * @param byteSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TBYTESINK.
+     * @param shortSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TSHORTSINK.
+     * @param intSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TINTSINK.
+     * @param longSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TLONGSINK.
+     * @param floatSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TFLOATSINK.
+     * @param doubleSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TDOUBLESINK.
+     * @param booleanAsByteSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TBOOLEANASBYTE.
+     * @param charSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TCHARSINK.
+     * @param stringSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TSTRINGSINK.
+     * @param dateTimeAsLongSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TDATETIMEASLONG.
+     * @param timestampAsLongSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TTIMESTAMPASLONG.
+     * @return A SinkFactory configured with the provided suppliers.
      */
     static <TBYTESINK extends Sink<byte[]>, TSHORTSINK extends Sink<short[]>, TINTSINK extends Sink<int[]>, TLONGSINK extends Sink<long[]>, TFLOATSINK extends Sink<float[]>, TDOUBLESINK extends Sink<double[]>, TBOOLASBYTESINK extends Sink<byte[]>, TCHARSINK extends Sink<char[]>, TSTRINGSINK extends Sink<String[]>, TDATETIMEASLONGSINK extends Sink<long[]>, TTIMESTAMPASLONGSINK extends Sink<long[]>> SinkFactory ofSimple(
             IntFunction<TBYTESINK> byteSinkSupplier,
