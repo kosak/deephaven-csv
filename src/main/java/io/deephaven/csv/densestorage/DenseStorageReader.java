@@ -137,7 +137,7 @@ public final class DenseStorageReader {
         packedCurrent = tail.packedBegin;
         packedEnd = tail.packedEnd;
 
-        largeArrayBuffer = tail.largeArryBuffer;
+        largeArrayBuffer = tail.largeArrayBuffer;
         largeArrayCurrent = tail.largeArrayBegin;
         largeArrayEnd = tail.largeArrayEnd;;
     }
