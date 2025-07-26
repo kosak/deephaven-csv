@@ -203,8 +203,8 @@ public final class DenseStorageWriter {
                 largeArrayBuffer, largeArrayBegin, largeArrayCurrent);
 
         // DenseStorageWriter now owns suffix of the buffers after what the QueueNode owns.
-        // packedBuffer[packedCurrent...end)
-        // largeArrayBuffer[largeArrayCurrent...end)
+        // packedBuffer[packedCurrent...packedBuffer.length)
+        // largeArrayBuffer[largeArrayCurrent...largeArrayBuffer.length)
         packedBegin = packedCurrent;
         largeArrayBegin = largeArrayCurrent;
 
