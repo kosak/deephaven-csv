@@ -226,6 +226,39 @@ public interface SinkFactory {
     /**
      * Variant of {@link SinkFactory#of} that allows you to specify reserved sentinel values that should be excluded
      * from their corresponding type.
+     * @param <TBYTESINK> The type of the byteSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;byte[]&gt; and Source&lt;byte[]&gt;
+     * @param <TSHORTSINK> The type of the shortSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;short[]&gt; and Source&lt;short[]&gt;
+     * @param <TINTSINK> The type of the intSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;int[]&gt; and Source&lt;int[]&gt;
+     * @param <TLONGSINK> The type of the longSinkSupplier. As one of the integral type suppliers, needs to extend both Sink&lt;long[]&gt; and Source&lt;long[]&gt;
+     * @param <TFLOATSINK> The type of the floatSinkSupplier. Extends Sink&lt;float[]&gt;
+     * @param <TDOUBLESINK> The type of the doubleSinkSupplier. Extends Sink&lt;double[]&gt;
+     * @param <TBOOLASBYTESINK> The type of the boolAsByteSinkSupplier. Because the raw type is byte, extends Sink&lt;byte[]&gt;, not Sink&lt;bool[]&gt;
+     * @param <TCHARSINK> The type of the charSinkSupplier. Extends Sink&lt;char[]&gt;
+     * @param <TSTRINGSINK> The type of the charSinkSupplier. Extends Sink&lt;String[]&gt;
+     * @param <TDATETIMEASLONGSINK> The type of the dateTimeAsLongSinkSupplier. Because the raw type is long, extends Sink&lt;long[]&gt;
+     * @param <TTIMESTAMPASLONGSINK> The type of the timestampAsLongSinkSupplier. Because the raw type is long, extends Sink&lt;long[]&gt;
+     * @param byteSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TBYTESINK.
+     * @param reservedByte If not null, a sentinel byte value that the caller wishes to exclude from the set of valid bytes. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param shortSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TSHORTSINK.
+     * @param reservedShort If not null, a sentinel short value that the caller wishes to exclude from the set of valid shorts. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param intSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TINTSINK.
+     * @param reservedInt If not null, a sentinel int value that the caller wishes to exclude from the set of valid ints. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param longSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TLONGSINK.
+     * @param reservedLong If not null, a sentinel long value that the caller wishes to exclude from the set of valid longs. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param floatSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TFLOATSINK.
+     * @param reservedFloat If not null, a sentinel float value that the caller wishes to exclude from the set of valid floats. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param doubleSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TDOUBLESINK.
+     * @param reservedDouble If not null, a sentinel double value that the caller wishes to exclude from the set of valid doubles. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param booleanAsByteSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TBOOLEANASBYTE.
+     * @param charSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TCHARSINK.
+     * @param reservedChar If not null, a sentinel char value that the caller wishes to exclude from the set of valid chars. If such a value is encountered, the parser will try to treat the value as the next-wider type.
+     * @param stringSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TSTRINGSINK.
+     * @param reservedString If not null, a sentinel String value that the caller wishes to exclude from the set of valid strings. If such a value is encountered, the parser will fail.
+     * @param dateTimeAsLongSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TDATETIMEASLONG.
+     * @param reservedDateTimeAsLong If not null, a sentinel Long value that the caller wishes to exclude from the set of valid datetimes as longs. If such a value is encountered, the parser will fail.
+     * @param timestampAsLongSinkSupplier A lambda implementing a factory that takes a column number (for informational purposes) and returns a TTIMESTAMPASLONG.
+     * @param reservedTimestampAsLong If not null, a sentinel Long value that the caller wishes to exclude from the set of valid timestamps as longs. If such a value is encountered, the parser will fail.
+     * @return A SinkFactory configured with the provided suppliers.
      */
     static <TBYTESINK extends Sink<byte[]>, TSHORTSINK extends Sink<short[]>, TINTSINK extends Sink<int[]>, TLONGSINK extends Sink<long[]>, TFLOATSINK extends Sink<float[]>, TDOUBLESINK extends Sink<double[]>, TBOOLASBYTESINK extends Sink<byte[]>, TCHARSINK extends Sink<char[]>, TSTRINGSINK extends Sink<String[]>, TDATETIMEASLONGSINK extends Sink<long[]>, TTIMESTAMPASLONGSINK extends Sink<long[]>> SinkFactory ofSimple(
             IntFunction<TBYTESINK> byteSinkSupplier,
