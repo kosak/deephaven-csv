@@ -64,6 +64,7 @@ public interface Parser<TARRAY> {
      *        {@link Sink} or replacing previously-written pad values in the {@link Sink}. This value is simply passed
      *        on to {@link Sink#write} which may use it as a hint to slightly simplify its logic.
      * @return The end range (exclusive) of the values parsed. Returns {@code begin} if no values were parsed.
+     * @throws CsvReaderException if the parse is not successful
      */
     long tryParse(
             GlobalContext gctx,
