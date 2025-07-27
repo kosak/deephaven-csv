@@ -62,6 +62,7 @@ public final class CsvReader {
      *        must be thread safe.
      * @return A CsvReader.Result containing the column names, the number of columns, and the final set of
      *         fully-populated Sinks.
+     * @throws CsvReaderException if an error occurred while reading the input
      */
     public static Result read(final CsvSpecs specs, final InputStream stream, final SinkFactory sinkFactory)
             throws CsvReaderException {
@@ -294,17 +295,22 @@ public final class CsvReader {
             this.columns = columns;
         }
 
-        /** Number of rows in the input. */
+        /** Number of rows in the input.
+         * @return The number of rows in the input
+         * */
         public long numRows() {
             return numRows;
         }
 
-        /** The number of columns. */
+        /** The number of columns.
+         * @return The number of columns in the input
+         * */
         public int numCols() {
             return columns.length;
         }
 
-        /** The columns. */
+        /** The columns.
+         * @return The columns of the input, parses as an array of ResultColumn */
         public ResultColumn[] columns() {
             return columns;
         }
