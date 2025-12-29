@@ -35,6 +35,10 @@ public final class ColumnSet {
         this.columnSize = columnSize;
     }
 
+    public Column<?>[] getColumns() {
+        return columns;
+    }
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();

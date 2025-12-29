@@ -1,6 +1,5 @@
 package io.deephaven.csv.testutil;
 
-import io.deephaven.csv.CsvReaderTest;
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.parsers.DataType;
 import io.deephaven.csv.reading.CsvReader;
@@ -33,13 +32,13 @@ public class CsvTestUtil {
     }
 
     public static void invokeTest(final CsvSpecs specs, final String input, final ColumnSet expected,
-                                  final SinkFactory sinkFactory, CsvReaderTest.MakeCustomColumn makeCustomColumn)
+                                  final SinkFactory sinkFactory, MakeCustomColumn makeCustomColumn)
             throws CsvReaderException {
         invokeTest(specs, toInputStream(input), expected, sinkFactory, makeCustomColumn);
     }
 
     public static void invokeTest(final CsvSpecs specs, final InputStream inputStream, final ColumnSet expected,
-                                  final SinkFactory sinkFactory, CsvReaderTest.MakeCustomColumn makeCustomColumn)
+                                  final SinkFactory sinkFactory, MakeCustomColumn makeCustomColumn)
             throws CsvReaderException {
         final CsvReader.Result result = parse(specs, inputStream, sinkFactory);
         final ColumnSet actual = toColumnSet(result, makeCustomColumn);
@@ -81,9 +80,9 @@ public class CsvTestUtil {
     }
 
     /***
-     * Converts the {@link CsvReader.Result} to a {@link CsvReaderTest.ColumnSet}.
+     * Converts the {@link CsvReader.Result} to a {@link ColumnSet}.
      */
-    public static CsvReaderTest.ColumnSet toColumnSet(final CsvReader.Result result, CsvReaderTest.MakeCustomColumn makeCustomColumn) {
+    public static ColumnSet toColumnSet(final CsvReader.Result result, MakeCustomColumn makeCustomColumn) {
         final int numCols = result.numCols();
         final CsvReader.ResultColumn[] resultColumns = result.columns();
 
@@ -94,11 +93,11 @@ public class CsvTestUtil {
             final CsvReader.ResultColumn rc = resultColumns[ii];
             columns[ii] = makeColumn(rc.name(), rc.dataType(), rc.data(), sizeAsInt, makeCustomColumn);
         }
-        return CsvReaderTest.ColumnSet.of(columns);
+        return ColumnSet.of(columns);
     }
 
     private static Column<?> makeColumn(final String name, final DataType dataType, final Object col,
-                                        final int size, CsvReaderTest.MakeCustomColumn makeCustomColumn) {
+                                        final int size, MakeCustomColumn makeCustomColumn) {
         switch (dataType) {
             case BOOLEAN_AS_BYTE: {
                 return Column.ofArray(name, col, size).reinterpret(boolean.class);
@@ -135,17 +134,17 @@ public class CsvTestUtil {
 
     public static SinkFactory makeMySinkFactory() {
         return SinkFactory.arrays(
-                CsvReaderTest.Sentinels.NULL_BYTE,
-                CsvReaderTest.Sentinels.NULL_SHORT,
-                CsvReaderTest.Sentinels.NULL_INT,
-                CsvReaderTest.Sentinels.NULL_LONG,
-                CsvReaderTest.Sentinels.NULL_FLOAT,
-                CsvReaderTest.Sentinels.NULL_DOUBLE,
-                CsvReaderTest.Sentinels.NULL_BOOLEAN_AS_BYTE,
-                CsvReaderTest.Sentinels.NULL_CHAR,
+                Sentinels.NULL_BYTE,
+                Sentinels.NULL_SHORT,
+                Sentinels.NULL_INT,
+                Sentinels.NULL_LONG,
+                Sentinels.NULL_FLOAT,
+                Sentinels.NULL_DOUBLE,
+                Sentinels.NULL_BOOLEAN_AS_BYTE,
+                Sentinels.NULL_CHAR,
                 null,
-                CsvReaderTest.Sentinels.NULL_DATETIME_AS_LONG,
-                CsvReaderTest.Sentinels.NULL_TIMESTAMP_AS_LONG);
+                Sentinels.NULL_DATETIME_AS_LONG,
+                Sentinels.NULL_TIMESTAMP_AS_LONG);
     }
 
     public static SinkFactory makeBlackholeSinkFactory() {

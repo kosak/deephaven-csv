@@ -383,10 +383,10 @@ public class CsvReaderTest {
                         + "-5,baz,false,3.0\n";
         final CsvReader.Result result = CsvTestUtil.parse(CsvTestUtil.defaultCsvBuilder().quote('|').build(), CsvTestUtil.toInputStream(input));
         final ColumnSet cs = CsvTestUtil.toColumnSet(result, null);
-        Assertions.assertThat(cs.columns[0].name()).isEqualTo("Some\nInts");
-        Assertions.assertThat(cs.columns[1].name()).isEqualTo("Some\rStrings");
-        Assertions.assertThat(cs.columns[2].name()).isEqualTo("Some\r\nBools");
-        Assertions.assertThat(cs.columns[3].name()).isEqualTo("Some\r\n\nDoubles");
+        Assertions.assertThat(cs.getColumns()[0].name()).isEqualTo("Some\nInts");
+        Assertions.assertThat(cs.getColumns()[1].name()).isEqualTo("Some\rStrings");
+        Assertions.assertThat(cs.getColumns()[2].name()).isEqualTo("Some\r\nBools");
+        Assertions.assertThat(cs.getColumns()[3].name()).isEqualTo("Some\r\n\nDoubles");
     }
 
     @Test
@@ -926,7 +926,7 @@ public class CsvReaderTest {
                     final InputStream inputStream = CsvTestUtil.toInputStream(input);
                     final CsvSpecs specs = CsvTestUtil.defaultCsvBuilder().parsers(Parsers.COMPLETE).build();
                     final ColumnSet columnSet = CsvTestUtil.toColumnSet(CsvTestUtil.parse(specs, inputStream), null);
-                    final Class<?> actualType = columnSet.columns[0].reinterpretedType();
+                    final Class<?> actualType = columnSet.getColumns()[0].reinterpretedType();
                     Assertions.assertThat(actualType)
                             .withFailMessage(
                                     "Expected to infer type %s; actually inferred %s. Failing input: %s",
