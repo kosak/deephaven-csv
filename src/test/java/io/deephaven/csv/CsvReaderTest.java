@@ -9,21 +9,17 @@ import gnu.trove.list.array.TShortArrayList;
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.densestorage.DenseStorageConstants;
 import io.deephaven.csv.parsers.DataType;
-import io.deephaven.csv.parsers.IteratorHolder;
 import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.parsers.Parsers;
 import io.deephaven.csv.reading.CsvReader;
 import io.deephaven.csv.reading.cells.DelimitedCellGrabber;
-import io.deephaven.csv.sinks.Sink;
 import io.deephaven.csv.sinks.SinkFactory;
-import io.deephaven.csv.sinks.Source;
-import io.deephaven.csv.tokenization.RangeTests;
+import io.deephaven.csv.testutil.*;
 import io.deephaven.csv.tokenization.Tokenizer;
 import io.deephaven.csv.util.CsvReaderException;
 import io.deephaven.csv.util.Renderer;
 import org.apache.commons.io.input.ReaderInputStream;
 import org.assertj.core.api.Assertions;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,7 +27,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -407,10 +402,10 @@ public class CsvReaderTest {
                         + "-5,baz,false,3.0\n";
         final CsvReader.Result result = parse(defaultCsvBuilder().quote('|').build(), toInputStream(input));
         final ColumnSet cs = toColumnSet(result, null);
-        Assertions.assertThat(cs.columns[0].name).isEqualTo("Some\nInts");
-        Assertions.assertThat(cs.columns[1].name).isEqualTo("Some\rStrings");
-        Assertions.assertThat(cs.columns[2].name).isEqualTo("Some\r\nBools");
-        Assertions.assertThat(cs.columns[3].name).isEqualTo("Some\r\n\nDoubles");
+        Assertions.assertThat(cs.columns[0].name()).isEqualTo("Some\nInts");
+        Assertions.assertThat(cs.columns[1].name()).isEqualTo("Some\rStrings");
+        Assertions.assertThat(cs.columns[2].name()).isEqualTo("Some\r\nBools");
+        Assertions.assertThat(cs.columns[3].name()).isEqualTo("Some\r\n\nDoubles");
     }
 
     @Test
@@ -950,7 +945,7 @@ public class CsvReaderTest {
                     final InputStream inputStream = toInputStream(input);
                     final CsvSpecs specs = defaultCsvBuilder().parsers(Parsers.COMPLETE).build();
                     final ColumnSet columnSet = toColumnSet(parse(specs, inputStream), null);
-                    final Class<?> actualType = columnSet.columns[0].reinterpretedType;
+                    final Class<?> actualType = columnSet.columns[0].reinterpretedType();
                     Assertions.assertThat(actualType)
                             .withFailMessage(
                                     "Expected to infer type %s; actually inferred %s. Failing input: %s",
@@ -2593,153 +2588,6 @@ public class CsvReaderTest {
         shutdownResponse.await();
     }
 
-    private static final class RepeatingInputStream extends InputStream {
-        private byte[] data;
-        private final byte[] body;
-        private int bodyRepeatsRemaining;
-        private final byte[] tempBufferForRead;
-        private int offset;
-
-        public RepeatingInputStream(final String header, final String body, int bodyRepeats) {
-            this.data = header.getBytes(StandardCharsets.UTF_8);
-            this.body = body.getBytes(StandardCharsets.UTF_8);
-            bodyRepeatsRemaining = bodyRepeats;
-            tempBufferForRead = new byte[1];
-            offset = 0;
-
-        }
-
-        @Override
-        public int read() throws IOException {
-            final int numBytes = read(tempBufferForRead, 0, 1);
-            if (numBytes == 0) {
-                return -1;
-            }
-            return tempBufferForRead[0] & 0xff;
-        }
-
-        @Override
-        public int read(byte @NotNull [] b, int off, int len) {
-            if (len == 0) {
-                return 0;
-            }
-            while (offset == data.length) {
-                if (bodyRepeatsRemaining == 0) {
-                    return -1;
-                }
-                data = body;
-                offset = 0;
-                --bodyRepeatsRemaining;
-            }
-            final int currentSize = data.length - offset;
-            final int sizeToUse = Math.min(currentSize, len);
-            System.arraycopy(data, offset, b, off, sizeToUse);
-            offset += sizeToUse;
-            return sizeToUse;
-        }
-    }
-
-    private static class MyBigDecimalParser implements Parser<BigDecimal[]> {
-        @NotNull
-        @Override
-        public ParserContext<BigDecimal[]> makeParserContext(GlobalContext gctx, int chunkSize) {
-            final MyBigDecimalSink sink = new MyBigDecimalSink();
-            return new ParserContext<>(sink, null, DataType.CUSTOM, new BigDecimal[chunkSize]);
-        }
-
-        @Override
-        public long tryParse(
-                GlobalContext gctx,
-                ParserContext<BigDecimal[]> pctx,
-                IteratorHolder ih,
-                long begin,
-                long end,
-                boolean appending)
-                throws CsvReaderException {
-            final boolean[] nulls = gctx.nullChunk();
-
-            final Sink<BigDecimal[]> sink = pctx.sink();
-            final BigDecimal[] values = pctx.valueChunk();
-
-            // Reusable buffer
-            char[] charData = new char[0];
-
-            long current = begin;
-            int chunkIndex = 0;
-            do {
-                if (chunkIndex == values.length) {
-                    sink.write(values, nulls, current, current + chunkIndex, appending);
-                    current += chunkIndex;
-                    chunkIndex = 0;
-                }
-                if (current + chunkIndex == end) {
-                    break;
-                }
-                if (gctx.isNullCell(ih)) {
-                    nulls[chunkIndex++] = true;
-                    continue;
-                }
-                final ByteSlice bs = ih.bs();
-                if (!RangeTests.isAscii(bs.data(), bs.begin(), bs.end())) {
-                    break;
-                }
-
-                // Convert bytes to chars. Annoying.
-                if (charData.length < bs.size()) {
-                    charData = new char[bs.size()];
-                }
-                int destIndex = 0;
-                for (int cur = bs.begin(); cur != bs.end(); ++cur) {
-                    charData[destIndex++] = (char) bs.data()[cur];
-                }
-
-                try {
-                    values[chunkIndex] = new BigDecimal(charData, 0, destIndex);
-                } catch (NumberFormatException ne) {
-                    break;
-                }
-                nulls[chunkIndex] = false;
-                ++chunkIndex;
-            } while (ih.tryMoveNext());
-            sink.write(values, nulls, current, current + chunkIndex, appending);
-            return current + chunkIndex;
-        }
-    }
-
-    private static class MyBigDecimalSink implements Sink<BigDecimal[]> {
-        private final List<BigDecimal> dest = new ArrayList<>();
-
-        @Override
-        public void write(
-                BigDecimal[] src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
-            if (destBegin == destEnd) {
-                return;
-            }
-
-            final int size = Math.toIntExact(destEnd - destBegin);
-            if (appending) {
-                // If the new area starts beyond the end of the destination, pad the destination.
-                while (dest.size() < destBegin) {
-                    dest.add(null);
-                }
-                for (int ii = 0; ii < size; ++ii) {
-                    dest.add(isNull[ii] ? null : src[ii]);
-                }
-                return;
-            }
-
-            final int destBeginAsInt = Math.toIntExact(destBegin);
-            for (int ii = 0; ii < size; ++ii) {
-                dest.set(destBeginAsInt + ii, isNull[ii] ? null : src[ii]);
-            }
-        }
-
-        @Override
-        public Object getUnderlying() {
-            return dest;
-        }
-    }
-
     private static final class ColumnSet {
         public static final ColumnSet NONE = new ColumnSet(new Column[0], 0);
 
@@ -2798,84 +2646,6 @@ public class CsvReaderTest {
 
         private static String safeToString(Object o) {
             return o == null ? "(null)" : o.toString();
-        }
-    }
-
-    private static final class Column<TARRAY> {
-        private final String name;
-        private final TARRAY values;
-        private final int size;
-        private final Class<?> reinterpretedType;
-
-        public static Column<byte[]> ofValues(final String name, final byte... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static Column<short[]> ofValues(final String name, final short... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static Column<int[]> ofValues(final String name, final int... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static Column<long[]> ofValues(final String name, final long... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static Column<float[]> ofValues(final String name, final float... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static Column<double[]> ofValues(final String name, final double... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static Column<char[]> ofValues(final String name, final char... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static <T> Column<T[]> ofRefs(final String name, final T... values) {
-            return ofArray(name, values, values.length);
-        }
-
-        public static <TARRAY> Column<TARRAY> ofArray(final String name, final TARRAY values, int size) {
-            return new Column<>(name, values, size);
-        }
-
-        private Column(final String name, final TARRAY values, int size) {
-            this(name, values, size, values.getClass().getComponentType());
-        }
-
-        private Column(final String name, final TARRAY values, int size, Class<?> reinterpretedType) {
-            this.name = name;
-            this.values = values;
-            this.size = size;
-            this.reinterpretedType = reinterpretedType;
-        }
-
-        public Column<TARRAY> reinterpret(Class<?> reinterpretedType) {
-            return new Column<>(name, values, size, reinterpretedType);
-        }
-
-        public int size() {
-            return size;
-        }
-
-        public String name() {
-            return name;
-        }
-
-        public Class<?> elementType() {
-            return values.getClass().getComponentType();
-        }
-
-        public Class<?> reinterpretedType() {
-            return reinterpretedType;
-        }
-
-        public Object getItem(int index) {
-            return Array.get(values, index);
         }
     }
 
@@ -3027,32 +2797,6 @@ public class CsvReaderTest {
                 Blackhole::new);
     }
 
-    private static class Blackhole<TARRAY> implements Sink<TARRAY>, Source<TARRAY> {
-        private final int colNum;
-
-        public Blackhole(int colNum) {
-            this.colNum = colNum;
-        }
-
-        @Override
-        public void write(TARRAY src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
-            // Do nothing.
-        }
-
-        /**
-         * For the sake of one of our unit tests, we return the colNum as our underlying.
-         */
-        @Override
-        public Object getUnderlying() {
-            return colNum;
-        }
-
-        @Override
-        public void read(TARRAY dest, boolean[] isNull, long srcBegin, long srcEnd) {
-            // Do nothing.
-        }
-    }
-
     private static SinkFactory makeBlackholeSinkFactoryWithFailingDoubleSink() {
         return SinkFactory.of(
                 Blackhole::new,
@@ -3103,174 +2847,6 @@ public class CsvReaderTest {
                 Blackhole::new,
                 Blackhole::new,
                 Blackhole::new);
-    }
-
-    private static class FailingSink<TARRAY> implements Sink<TARRAY>, Source<TARRAY> {
-        private final int colNum;
-
-        public FailingSink(int colNum) {
-            this.colNum = colNum;
-        }
-
-        @Override
-        public void write(TARRAY src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
-            throw new RuntimeException("synthetic error for testing: out of memory");
-        }
-
-        /**
-         * For the sake of one of our unit tests, we return the colNum as our underlying.
-         */
-        @Override
-        public Object getUnderlying() {
-            return colNum;
-        }
-
-        @Override
-        public void read(TARRAY dest, boolean[] isNull, long srcBegin, long srcEnd) {
-            // Do nothing.
-        }
-    }
-
-    private static class ThrowingSink<TARRAY> implements Sink<TARRAY>, Source<TARRAY> {
-        private final CountDownLatch incomingSinkReady;
-
-        public ThrowingSink(CountDownLatch incomingSinkReady) {
-            this.incomingSinkReady = incomingSinkReady;
-        }
-
-        @Override
-        public void write(TARRAY src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
-            if (destBegin == destEnd) {
-                return;
-            }
-            try {
-                incomingSinkReady.await();
-                throw new RuntimeException("synthetic error for testing");
-            } catch (InterruptedException e) {
-                throw new RuntimeException("Interrupted");
-            }
-        }
-
-        @Override
-        public Object getUnderlying() {
-            return null;
-        }
-
-        @Override
-        public void read(TARRAY dest, boolean[] isNull, long srcBegin, long srcEnd) {
-            // Do nothing.
-        }
-    }
-
-    private static class StubbornSink<TARRAY> implements Sink<TARRAY>, Source<TARRAY> {
-        private final long timeout;
-        private final CountDownLatch outgoingSinkReady;
-        private final CountDownLatch incomingShutdownRequest;
-        private final CountDownLatch outgoingShutdownComplete;
-
-        public StubbornSink(Duration timeout, CountDownLatch outgoingSinkReady,
-                CountDownLatch incomingShutdownRequest, CountDownLatch outgoingShutdownComplete) {
-            this.timeout = timeout.toMillis();
-            this.outgoingSinkReady = outgoingSinkReady;
-            this.incomingShutdownRequest = incomingShutdownRequest;
-            this.outgoingShutdownComplete = outgoingShutdownComplete;
-        }
-
-        @Override
-        public void write(TARRAY src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
-            if (destBegin == destEnd) {
-                return;
-            }
-
-            // Notify other cooperating sink that we are inside our "write" stage.
-            outgoingSinkReady.countDown();
-
-            final long expirationTime = System.currentTimeMillis() + timeout;
-            while (true) {
-                long remainingTime = expirationTime - System.currentTimeMillis();
-                try {
-                    boolean ignored = incomingShutdownRequest.await(remainingTime, TimeUnit.MILLISECONDS);
-                    // Exit infinite loop, regardless of message received or timeout,
-                    break;
-                } catch (InterruptedException e) {
-                    // Ignore attempts to interrupt me earlier than the timeout.
-                }
-            }
-            outgoingShutdownComplete.countDown();
-        }
-
-        @Override
-        public Object getUnderlying() {
-            return null;
-        }
-
-        @Override
-        public void read(TARRAY dest, boolean[] isNull, long srcBegin, long srcEnd) {
-            // Do nothing.
-        }
-    }
-
-    private static class SynchronizingSink<TARRAY> implements Sink<TARRAY>, Source<TARRAY> {
-        private final int colNum;
-        private final SyncState syncState;
-        private long sizeWritten = 0;
-
-        public SynchronizingSink(int colNum, SyncState syncState) {
-            this.colNum = colNum;
-            this.syncState = syncState;
-        }
-
-        @Override
-        public void write(TARRAY src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
-            sizeWritten += destEnd - destBegin;
-            syncState.maybeWait(colNum, sizeWritten);
-        }
-
-        @Override
-        public Object getUnderlying() {
-            return null;
-        }
-
-        @Override
-        public void read(TARRAY dest, boolean[] isNull, long srcBegin, long srcEnd) {
-            // Do nothing.
-        }
-    }
-
-    private static class SyncState {
-        private final int numParticipatingColumns;
-        private final long thresholdSize;
-        private long nextThreshold = 0;
-        private int numWaiters = 0;
-
-        public SyncState(int numParticipatingColumns, long thresholdSize) {
-            this.numParticipatingColumns = numParticipatingColumns;
-            this.thresholdSize = thresholdSize;
-        }
-
-        public synchronized void maybeWait(final int colNum, final long sizeWritten) {
-            while (true) {
-                if (sizeWritten < nextThreshold) {
-                    return;
-                }
-
-                if (numWaiters == numParticipatingColumns - 1) {
-                    // Everyone else is waiting, so advance the threshold.
-                    nextThreshold += thresholdSize;
-                    notifyAll();
-                    continue;
-                }
-
-                ++numWaiters;
-                try {
-                    wait();
-                } catch (InterruptedException ie) {
-                    throw new RuntimeException("Interrupted", ie);
-                } finally {
-                    --numWaiters;
-                }
-            }
-        }
     }
 
     private static String repeat(String x, int count) {
