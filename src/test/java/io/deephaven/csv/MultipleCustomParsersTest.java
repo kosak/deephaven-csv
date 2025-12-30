@@ -8,7 +8,6 @@ import io.deephaven.csv.util.CsvReaderException;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +58,33 @@ public class MultipleCustomParsersTest {
                                 new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤❤he❤llo❤❤"),
                                 new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤hello❤"),
                                 new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤he❤llo❤")
+                        ));
+
+        final MakeCustomColumn makeCustomColumn = (name, obj, size) -> {
+            final TaggedHeartValue[] arr = ((List<TaggedHeartValue>) obj).toArray(new TaggedHeartValue[0]);
+            return Column.ofArray(name, arr, size);
+        };
+
+        CsvTestUtil.invokeTest(csvSpecsWithHearts(), input, expected, CsvTestUtil.makeMySinkFactory(),
+                makeCustomColumn);
+    }
+
+    @Test
+    public void twoToFourHearts() throws CsvReaderException {
+        final String input = "Key,Value\n" +
+                "A,❤hello❤\n" +
+                "B,❤❤hello❤❤\n" +
+                "C,❤hello❤\n" +
+                "D,❤he❤llo❤\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Key", "A", "B", "C", "D"),
+                        Column.ofRefs("Value",
+                                new TaggedHeartValue(HeartCategory.TWO_THROUGH_FOUR, "❤hello❤"),
+                                new TaggedHeartValue(HeartCategory.TWO_THROUGH_FOUR, "❤❤hello❤❤"),
+                                new TaggedHeartValue(HeartCategory.TWO_THROUGH_FOUR, "❤hello❤"),
+                                new TaggedHeartValue(HeartCategory.TWO_THROUGH_FOUR, "❤he❤llo❤")
                         ));
 
         final MakeCustomColumn makeCustomColumn = (name, obj, size) -> {
