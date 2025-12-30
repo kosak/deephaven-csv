@@ -37,7 +37,8 @@ public final class ParseDenseStorageToColumn {
             final String[] nullValueLiteralsToUse,
             final SinkFactory sinkFactory)
             throws CsvReaderException {
-        Set<Parser<?>> parserSet = new HashSet<>(parsers != null ? parsers : Parsers.DEFAULT);
+        // Canonicalize the parsers (remove duplicates) but preserve the order.
+        Set<Parser<?>> parserSet = new LinkedHashSet<>(parsers != null ? parsers : Parsers.DEFAULT);
 
         final Tokenizer tokenizer = new Tokenizer(specs.customDoubleParser(), specs.customTimeZoneParser());
         final Parser.GlobalContext gctx =

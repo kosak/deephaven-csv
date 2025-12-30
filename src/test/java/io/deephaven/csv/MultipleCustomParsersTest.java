@@ -41,6 +41,35 @@ public class MultipleCustomParsersTest {
                 makeCustomColumn);
     }
 
+    @Test
+    public void zeroToFiveHearts() throws CsvReaderException {
+        final String input = "Key,Value\n" +
+                "A,hello\n" +
+                "B,❤hello\n" +
+                "C,❤❤he❤llo❤❤\n" +
+                "D,❤hello❤\n" +
+                "E,❤he❤llo❤\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Key", "A", "B", "C", "D", "E"),
+                        Column.ofRefs("Value",
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "hello"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤hello"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤❤he❤llo❤❤"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤hello❤"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_FIVE, "❤he❤llo❤")
+                        ));
+
+        final MakeCustomColumn makeCustomColumn = (name, obj, size) -> {
+            final TaggedHeartValue[] arr = ((List<TaggedHeartValue>) obj).toArray(new TaggedHeartValue[0]);
+            return Column.ofArray(name, arr, size);
+        };
+
+        CsvTestUtil.invokeTest(csvSpecsWithHearts(), input, expected, CsvTestUtil.makeMySinkFactory(),
+                makeCustomColumn);
+    }
+
     private static CsvSpecs csvSpecsWithHearts() {
         HeartParser zeroThroughThreeParser = new HeartParser(0, 3, HeartCategory.ZERO_THROUGH_THREE);
         HeartParser twoThroughFourParser = new HeartParser(2, 4, HeartCategory.TWO_THROUGH_FOUR);
@@ -82,11 +111,11 @@ public class MultipleCustomParsersTest {
                 long end,
                 boolean appending)
                 throws CsvReaderException {
+            System.out.println("Hi, doing tryParse for " + minHearts + "," + maxHearts + ", " + heartCategory);
             final boolean[] nulls = gctx.nullChunk();
 
             final Sink<TaggedHeartValue[]> sink = pctx.sink();
             final TaggedHeartValue[] values = pctx.valueChunk();
-
 
             long current = begin;
             int chunkIndex = 0;
@@ -104,7 +133,6 @@ public class MultipleCustomParsersTest {
                     continue;
                 }
                 final ByteSlice bs = ih.bs();
-
 
                 final int numHearts = countUtf8Hearts(bs);
                 if (numHearts < minHearts || numHearts > maxHearts) {
@@ -137,7 +165,6 @@ public class MultipleCustomParsersTest {
             for (int i = bs.begin(); i <= bs.end() - 3; ++i) {
                 if (data[i] == utf8Heart0 && data[i + 1] == utf8Heart1 && data[i + 2] == utf8Heart2) {
                     ++result;
-                    i += 3;
                 }
             }
             return result;
