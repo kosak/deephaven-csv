@@ -74,4 +74,12 @@ public final class IteratorHolder {
     public boolean isExhausted() {
         return isExhausted;
     }
+
+    /**
+     * The underlying DenseStorageReader
+     * @return The underlying DenseStorageReader
+     */
+    public DenseStorageReader dsr() {
+        return dsr;
+    }
 }

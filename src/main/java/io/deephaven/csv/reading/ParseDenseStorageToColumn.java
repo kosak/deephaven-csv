@@ -184,6 +184,53 @@ public final class ParseDenseStorageToColumn {
     }
 
     @NotNull
+    private static Result parseFromListNew(
+            final List<Parser<?>> parsersBeforeCustom,
+            final List<Parser<?>> customParsers,
+            final List<Parser<?>> parsersAfterCustom,
+            final Parser.GlobalContext gctx,
+            Moveable<IteratorHolder> ih,
+            Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
+        List<Parser<?>> parsers = new ArrayList<>();
+        parsers.addAll(parsersBeforeCustom);
+        final int customBegin = parsers.size();
+        parsers.addAll(customParsers);
+        final int customEnd = parsers.size();
+        parsers.addAll(parsersAfterCustom);
+
+        if (parsers.isEmpty()) {
+            throw new CsvReaderException("No available parsers.");
+        }
+
+        for (int ii = 0; ii < parsers.size() - 1; ++ii) {
+            final Pair<Result, Failure> rof;
+            if (ii < customBegin || ii >= customEnd) {
+                rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt.move());
+                if (rof.first != null) {
+                    return rof.first;
+                }
+                // If the operation failed, we need to move the IteratorHolders back to our local variables and try
+                // again. This might feel like overkill, but we are trying to be very disciplined about having at
+                // most one variable holding a reference to our DenseStorageReader.
+                ih = rof.second.ih.move();
+                ihAlt = rof.second.ihAlt.move();
+            } else {
+                Moveable<IteratorHolder> tempFullIterator = new Moveable<>(new IteratorHolder(ihAlt.get().dsr().copy());
+                rof = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator, ihAlt.move());
+                if (rof.first != null) {
+                    return rof.first;
+                }
+                ihAlt = rof.second.ihAlt.move();
+            }
+        }
+
+        // The final parser in the set gets special (more efficient) handling because there's nothing to
+        // fall back to.
+        ih.reset();
+        return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
+    }
+
+    @NotNull
     private static Result parseFromList(final List<Parser<?>> parsers, final Parser.GlobalContext gctx,
             Moveable<IteratorHolder> ih, Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
         if (parsers.isEmpty()) {

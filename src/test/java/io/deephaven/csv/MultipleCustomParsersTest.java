@@ -43,14 +43,14 @@ public class MultipleCustomParsersTest {
 
     private static CsvSpecs csvSpecsWithHearts() {
         HeartParser zeroThroughThreeParser = new HeartParser(0, 3, HeartCategory.ZERO_THROUGH_THREE);
-        // HeartParser twoThroughFourParser = new HeartParser(2, 4, HeartCategory.TWO_THROUGH_FOUR);
-        // HeartParser zeroThroughFiveParser = new HeartParser(0, 5, HeartCategory.ZERO_THROUGH_FIVE);
+        HeartParser twoThroughFourParser = new HeartParser(2, 4, HeartCategory.TWO_THROUGH_FOUR);
+        HeartParser zeroThroughFiveParser = new HeartParser(0, 5, HeartCategory.ZERO_THROUGH_FIVE);
 
         List<Parser<?>> parsers = new ArrayList<>(Parsers.DEFAULT);
         parsers.clear();
         parsers.add(zeroThroughThreeParser);
-        // parsers.add(twoThroughFourParser);
-        // parsers.add(zeroThroughFiveParser);
+        parsers.add(twoThroughFourParser);
+        parsers.add(zeroThroughFiveParser);
 
 
         return CsvTestUtil.defaultCsvBuilder().parsers(parsers).putParserForIndex(0, Parsers.STRING).build();
