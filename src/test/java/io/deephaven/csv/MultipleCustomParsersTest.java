@@ -137,7 +137,6 @@ public class MultipleCustomParsersTest {
                 long end,
                 boolean appending)
                 throws CsvReaderException {
-            System.out.println("Hi, doing tryParse for " + minHearts + "," + maxHearts + ", " + heartCategory);
             final boolean[] nulls = gctx.nullChunk();
 
             final Sink<TaggedHeartValue[]> sink = pctx.sink();
