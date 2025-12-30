@@ -15,7 +15,7 @@ public class MyBigDecimalParser implements Parser<BigDecimal[]> {
     @NotNull
     @Override
     public ParserContext<BigDecimal[]> makeParserContext(GlobalContext gctx, int chunkSize) {
-        final MyBigDecimalSink sink = new MyBigDecimalSink();
+        final MyReferenceTypeSink sink = new MyReferenceTypeSink();
         return new ParserContext<>(sink, null, DataType.CUSTOM, new BigDecimal[chunkSize]);
     }
 

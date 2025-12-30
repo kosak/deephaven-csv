@@ -1,11 +1,14 @@
 package io.deephaven.csv;
 
-import io.deephaven.csv.parsers.Parser;
-import io.deephaven.csv.parsers.Parsers;
+import io.deephaven.csv.containers.ByteSlice;
+import io.deephaven.csv.parsers.*;
+import io.deephaven.csv.sinks.Sink;
 import io.deephaven.csv.testutil.Column;
 import io.deephaven.csv.testutil.ColumnSet;
 import io.deephaven.csv.testutil.CsvTestUtil;
+import io.deephaven.csv.testutil.MyReferenceTypeSink;
 import io.deephaven.csv.util.CsvReaderException;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -25,10 +28,10 @@ public class MultipleCustomParsersTest {
                 ColumnSet.of(
                         Column.ofRefs("Key", "A", "B", "C", "D"),
                         Column.ofRefs("Value",
-                                TaggedHeartValue.of("hello", HeartCategory.ZERO_THROUGH_THREE),
-                                TaggedHeartValue.of("❤hello", HeartCategory.ZERO_THROUGH_THREE),
-                                TaggedHeartValue.of("❤hello❤", HeartCategory.ZERO_THROUGH_THREE),
-                                TaggedHeartValue.of("❤he❤llo❤", HeartCategory.ZERO_THROUGH_THREE)
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_THREE, "hello"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_THREE, "❤hello"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_THREE, "❤hello❤"),
+                                new TaggedHeartValue(HeartCategory.ZERO_THROUGH_THREE, "❤he❤llo❤")
                         ));
 
         CsvTestUtil.invokeTest(csvSpecsWithHearts(), input, expected);
@@ -47,8 +50,93 @@ public class MultipleCustomParsersTest {
         return CsvTestUtil.defaultCsvBuilder().parsers(parsers).build();
     }
 
-    private static final class HeartParser implements Parser<TaggedHeartValue> {
+    private static final class HeartParser implements Parser<TaggedHeartValue[]> {
+        private final int minHearts;
+        private final int maxHearts;
+        private final HeartCategory heartCategory;
 
+        public HeartParser(int minHearts, int maxHearts, HeartCategory heartCategory) {
+            this.minHearts = minHearts;
+            this.maxHearts = maxHearts;
+            this.heartCategory = heartCategory;
+        }
+
+        @NotNull
+        @Override
+        public ParserContext<TaggedHeartValue[]> makeParserContext(GlobalContext gctx, int chunkSize) {
+            final Sink<TaggedHeartValue[]> sink = new MyReferenceTypeSink<>();
+            return new ParserContext<>(sink, null, DataType.CUSTOM, new TaggedHeartValue[chunkSize]);
+        }
+
+        @Override
+        public long tryParse(
+                GlobalContext gctx,
+                ParserContext<TaggedHeartValue[]> pctx,
+                IteratorHolder ih,
+                long begin,
+                long end,
+                boolean appending)
+                throws CsvReaderException {
+            final boolean[] nulls = gctx.nullChunk();
+
+            final Sink<TaggedHeartValue[]> sink = pctx.sink();
+            final TaggedHeartValue[] values = pctx.valueChunk();
+
+
+            long current = begin;
+            int chunkIndex = 0;
+            do {
+                if (chunkIndex == values.length) {
+                    sink.write(values, nulls, current, current + chunkIndex, appending);
+                    current += chunkIndex;
+                    chunkIndex = 0;
+                }
+                if (current + chunkIndex == end) {
+                    break;
+                }
+                if (gctx.isNullCell(ih)) {
+                    nulls[chunkIndex++] = true;
+                    continue;
+                }
+                final ByteSlice bs = ih.bs();
+
+
+                final int numHearts = countUtf8Hearts(bs);
+                if (numHearts < minHearts || numHearts > maxHearts) {
+                    break;
+                }
+
+                values[chunkIndex] = new TaggedHeartValue(heartCategory, bs.toString());
+                nulls[chunkIndex++] = false;
+            } while (ih.tryMoveNext());
+            sink.write(values, nulls, current, current + chunkIndex, appending);
+            return current + chunkIndex;
+        }
+
+        // Simplistic code to go looking for the UTF-8 encoding of '❤'.
+        // Note that this sliding window search approach is OK because UTF-8 is
+        // self-synchronizing. That is, 0xe2 never appear in the middle of a UTF-8 sequence.
+        // If it appears, it will be at the start of a UTF-8 sequence.
+        private static int countUtf8Hearts(ByteSlice bs) {
+            // The UTF-8 encoding of '❤' (U+2764) (HEAVY BLACK HEART)
+            final byte utf8Heart0 = (byte)0xe2;
+            final byte utf8Heart1 = (byte)0x9d;
+            final byte utf8Heart2 = (byte)0xa4;
+
+            if (bs.size() < 3) {
+                return 0;
+            }
+
+            int result = 0;
+            final byte[] data = bs.data();
+            for (int i = bs.begin(); i <= bs.end() - 3; ++i) {
+                if (data[i] == utf8Heart0 && data[i + 1] == utf8Heart1 && data[i + 2] == utf8Heart2) {
+                    ++result;
+                    i += 3;
+                }
+            }
+            return result;
+        }
     }
 
     private enum HeartCategory { ZERO_THROUGH_THREE, TWO_THROUGH_FOUR, ZERO_THROUGH_FIVE };

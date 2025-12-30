@@ -6,12 +6,12 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MyBigDecimalSink implements Sink<BigDecimal[]> {
-    private final List<BigDecimal> dest = new ArrayList<>();
+public class MyReferenceTypeSink<T> implements Sink<T[]> {
+    private final List<T> dest = new ArrayList<>();
 
     @Override
     public void write(
-            BigDecimal[] src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
+            T[] src, boolean[] isNull, long destBegin, long destEnd, boolean appending) {
         if (destBegin == destEnd) {
             return;
         }
