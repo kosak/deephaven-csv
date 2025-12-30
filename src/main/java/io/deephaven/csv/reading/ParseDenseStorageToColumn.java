@@ -203,24 +203,22 @@ public final class ParseDenseStorageToColumn {
         }
 
         for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-            final Pair<Result, Failure> rof;
+            final Pair<Result, Moveable<IteratorHolder>> rof;
             if (ii < customBegin || ii >= customEnd) {
-                rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt.move());
+                rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt);
                 if (rof.first != null) {
                     return rof.first;
                 }
                 // If the operation failed, we need to move the IteratorHolders back to our local variables and try
                 // again. This might feel like overkill, but we are trying to be very disciplined about having at
                 // most one variable holding a reference to our DenseStorageReader.
-                ih = rof.second.ih.move();
-                ihAlt = rof.second.ihAlt.move();
+                ih = rof.second.move();
             } else {
-                Moveable<IteratorHolder> tempFullIterator = new Moveable<>(new IteratorHolder(ihAlt.get().dsr().copy());
-                rof = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator, ihAlt.move());
+                Moveable<IteratorHolder> tempFullIterator = new Moveable<>(new IteratorHolder(ihAlt.get().dsr().copy()));
+                rof = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator.move(), ihAlt);
                 if (rof.first != null) {
                     return rof.first;
                 }
-                ihAlt = rof.second.ihAlt.move();
             }
         }
 
@@ -230,34 +228,11 @@ public final class ParseDenseStorageToColumn {
         return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
     }
 
-    @NotNull
-    private static Result parseFromList(final List<Parser<?>> parsers, final Parser.GlobalContext gctx,
-            Moveable<IteratorHolder> ih, Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
-        if (parsers.isEmpty()) {
-            throw new CsvReaderException("No available parsers.");
-        }
-
-        for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-            final Pair<Result, Failure> rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt.move());
-            if (rof.first != null) {
-                return rof.first;
-            }
-            // If the operation failed, we need to move the IteratorHolders back to our local variables and try
-            // again. This might feel like overkill, but we are trying to be very disciplined about having at
-            // most one variable holding a reference to our DenseStorageReader.
-            ih = rof.second.ih.move();
-            ihAlt = rof.second.ihAlt.move();
-        }
-
-        // The final parser in the set gets special (more efficient) handling because there's nothing to
-        // fall back to.
-        ih.reset();
-        return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
-    }
-
-    private static <TARRAY> Pair<Result, Failure> tryTwoPhaseParse(final Parser<TARRAY> parser,
+    private static <TARRAY> Pair<Result, Moveable<IteratorHolder>> tryTwoPhaseParse(
+            final Parser<TARRAY> parser,
             final Parser.GlobalContext gctx,
-            final Moveable<IteratorHolder> ih, final Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
+            final Moveable<IteratorHolder> ih,
+            final IteratorHolder ihAlt) throws CsvReaderException {
         final long phaseOneStart = ih.get().numConsumed() - 1;
         final Parser.ParserContext<TARRAY> pctx = parser.makeParserContext(gctx, Parser.CHUNK_SIZE);
         final long end = parser.tryParse(gctx, pctx, ih.get(), phaseOneStart, Long.MAX_VALUE, true);
@@ -266,7 +241,7 @@ public final class ParseDenseStorageToColumn {
             // failure to the caller so that it can try the next one. Also, since we are being disciplined
             // about moving the IteratorHolders around, move them back to the caller so the caller can use
             // them again.
-            return new Pair<>(null, new Failure(ih.move(), ihAlt.move()));
+            return new Pair<>(null, ih.move());
         }
         if (phaseOneStart == 0) {
             // Reached end, and started at zero so everything was parsed and we are done.
@@ -275,14 +250,14 @@ public final class ParseDenseStorageToColumn {
         }
         final ParserResultWrapper<TARRAY> wrapper = new ParserResultWrapper<>(parser, pctx, phaseOneStart, end);
         ih.reset();
-        final Result result = performSecondParsePhase(gctx, wrapper, ihAlt.move());
+        final Result result = performSecondParsePhase(gctx, wrapper, ihAlt);
         return new Pair<>(result, null);
     }
 
     private static <TARRAY> Result performSecondParsePhase(final Parser.GlobalContext gctx,
-            final ParserResultWrapper<TARRAY> wrapper, final Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
-        ihAlt.get().tryMoveNext(); // Input is not empty, so we know this will succeed.
-        final long end = wrapper.parser.tryParse(gctx, wrapper.pctx, ihAlt.get(), 0, wrapper.begin, false);
+            final ParserResultWrapper<TARRAY> wrapper, final IteratorHolder ihAlt) throws CsvReaderException {
+        ihAlt.tryMoveNext(); // Input is not empty, so we know this will succeed.
+        final long end = wrapper.parser.tryParse(gctx, wrapper.pctx, ihAlt, 0, wrapper.begin, false);
 
         if (end == wrapper.begin) {
             return new Result(wrapper.pctx.sink(), wrapper.pctx.dataType());
@@ -424,16 +399,6 @@ public final class ParseDenseStorageToColumn {
          */
         public DataType dataType() {
             return dataType;
-        }
-    }
-
-    private static class Failure {
-        public final Moveable<IteratorHolder> ih;
-        public final Moveable<IteratorHolder> ihAlt;
-
-        public Failure(Moveable<IteratorHolder> ih, Moveable<IteratorHolder> ihAlt) {
-            this.ih = ih;
-            this.ihAlt = ihAlt;
         }
     }
 
