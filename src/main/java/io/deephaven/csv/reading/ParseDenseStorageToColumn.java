@@ -100,11 +100,6 @@ public final class ParseDenseStorageToColumn {
 
         final CategorizedParsers cats = CategorizedParsers.create(parserSet);
 
-        if (cats.customParser != null) {
-            ih.reset();
-            return onePhaseParse(cats.customParser, gctx, ihAlt.move());
-        }
-
         // Numerics are special and they get their own fast path that uses Sources and Sinks rather than
         // reparsing the text input.
         final MutableDouble dummyDouble = new MutableDouble();
@@ -112,18 +107,20 @@ public final class ParseDenseStorageToColumn {
             return parseNumerics(cats, gctx, ih.move(), ihAlt.move());
         }
 
-        List<Parser<?>> universeByPrecedence = Arrays.asList(Parsers.CHAR, Parsers.STRING);
+        List<Parser<?>> parsersBeforeCustom = Collections.emptyList();
         final MutableBoolean dummyBoolean = new MutableBoolean();
         final MutableLong dummyLong = new MutableLong();
         if (cats.timestampParser != null && tokenizer.tryParseLong(ih.get().bs(), dummyLong)) {
-            universeByPrecedence = Arrays.asList(cats.timestampParser, Parsers.CHAR, Parsers.STRING);
+            parsersBeforeCustom = Collections.singletonList(cats.timestampParser);
         } else if (cats.booleanParser != null && tokenizer.tryParseBoolean(ih.get().bs(), dummyBoolean)) {
-            universeByPrecedence = Arrays.asList(Parsers.BOOLEAN, Parsers.STRING);
+            parsersBeforeCustom = Collections.singletonList(cats.booleanParser);
         } else if (cats.dateTimeParser != null && tokenizer.tryParseDateTime(ih.get().bs(), dummyLong)) {
-            universeByPrecedence = Arrays.asList(Parsers.DATETIME, Parsers.STRING);
+            parsersBeforeCustom = Collections.singletonList(cats.dateTimeParser);
         }
-        List<Parser<?>> parsersToUse = limitToSpecified(universeByPrecedence, parserSet);
-        return parseFromList(parsersToUse, gctx, ih.move(), ihAlt.move());
+        return parseFromCuratedSelections(parsersBeforeCustom,
+                cats.customParsers,
+                cats.charAndStringParsers,
+                gctx, ih.move(), ihAlt.move());
     }
 
     @NotNull
@@ -139,16 +136,17 @@ public final class ParseDenseStorageToColumn {
         }
 
         if (!ih.get().isExhausted()) {
-            // More friendly error message here.
-            if (cats.charAndStringParsers.isEmpty()) {
+            if (cats.customParsers.isEmpty() && cats.charAndStringParsers.isEmpty()) {
                 final String message = String.format(
-                        "Consumed %d numeric items, then encountered a non-numeric item but there are no char/string parsers available.",
+                        "Consumed %d numeric items, then encountered a non-numeric item but there are no custom or char/string parsers available.",
                         ih.get().numConsumed() - 1);
                 throw new CsvReaderException(message);
             }
-            // Tried all numeric parsers but couldn't consume all input. Fall back to the char and string parsers.
+            // Tried all numeric parsers but couldn't consume all input. Fall back to the custom parsers (if any),
+            // then char and string parsers.
             wrappers.clear();
-            return parseFromList(cats.charAndStringParsers, gctx, ih.move(), ihAlt.move());
+            return parseFromCuratedSelections(new ArrayList<>(), cats.customParsers, cats.charAndStringParsers,
+                    gctx, ih.move(), ihAlt.move());
         }
 
         ih.reset();
@@ -161,7 +159,7 @@ public final class ParseDenseStorageToColumn {
         }
         // Otherwise (if some wrappers do not implement the Source interface), we have to do a reparse.
         final ParserResultWrapper<?> last = wrappers.get(wrappers.size() - 1);
-        return performSecondParsePhase(gctx, last, ihAlt.move());
+        return performSecondParsePhase(gctx, last, ihAlt.get());
     }
 
     private static boolean canUnify(final List<ParserResultWrapper<?>> items) {
@@ -184,7 +182,7 @@ public final class ParseDenseStorageToColumn {
     }
 
     @NotNull
-    private static Result parseFromList(
+    private static Result parseFromCuratedSelections(
             final List<Parser<?>> parsersBeforeCustom,
             final List<Parser<?>> customParsers,
             final List<Parser<?>> parsersAfterCustom,
@@ -453,15 +451,6 @@ public final class ParseDenseStorageToColumn {
                 throw new CsvReaderException("There is more than one timestamp parser in the parser set.");
             }
 
-            if (specifiedCustomParsers.size() > 1) {
-                throw new CsvReaderException("There is more than one custom parser in the parser set.");
-            }
-
-            if (!specifiedCustomParsers.isEmpty() && parsers.size() != 1) {
-                throw new CsvReaderException(
-                        "When a custom parser is specified, it must be the only parser in the set.");
-            }
-
             if (!specifiedNumericParsers.isEmpty() && !specifiedTimeStampParsers.isEmpty()) {
                 throw new CsvReaderException(
                         "The parser set must not contain both numeric and timestamp parsers.");
@@ -485,8 +474,6 @@ public final class ParseDenseStorageToColumn {
                     limitToSpecified(allCharAndStringParsersByPrecedence, specifiedCharAndStringParsers);
             final Parser<?> timestampParser =
                     specifiedTimeStampParsers.isEmpty() ? null : specifiedTimeStampParsers.get(0);
-            final Parser<?> customParser =
-                    specifiedCustomParsers.isEmpty() ? null : specifiedCustomParsers.get(0);
 
             return new CategorizedParsers(
                     booleanParser,
@@ -494,7 +481,7 @@ public final class ParseDenseStorageToColumn {
                     dateTimeParser,
                     charAndStringParsers,
                     timestampParser,
-                    customParser);
+                    specifiedCustomParsers);
         }
 
         private final Parser<?> booleanParser;
@@ -502,7 +489,7 @@ public final class ParseDenseStorageToColumn {
         private final Parser<?> dateTimeParser;
         private final List<Parser<?>> charAndStringParsers;
         private final Parser<?> timestampParser;
-        private final Parser<?> customParser;
+        private final List<Parser<?>> customParsers;
 
         private CategorizedParsers(
                 Parser<?> booleanParser,
@@ -510,13 +497,13 @@ public final class ParseDenseStorageToColumn {
                 Parser<?> dateTimeParser,
                 List<Parser<?>> charAndStringParsers,
                 Parser<?> timestampParser,
-                Parser<?> customParser) {
+                List<Parser<?>> customParsers) {
             this.booleanParser = booleanParser;
             this.numericParsers = numericParsers;
             this.dateTimeParser = dateTimeParser;
             this.charAndStringParsers = charAndStringParsers;
             this.timestampParser = timestampParser;
-            this.customParser = customParser;
+            this.customParsers = customParsers;
         }
     }
 
