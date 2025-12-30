@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class MultipleCustomParsersTest {
     @Test
@@ -36,9 +37,9 @@ public class MultipleCustomParsersTest {
     }
 
     private static CsvSpecs csvSpecsWithHearts() {
-        HeartParser zeroThroughThree = new HeartParser(0, 3, s -> new ZeroThroughThreeValue(s));
-        HeartParser twoThroughFour = new HeartParser(2, 4, s -> new TwoThroughFourValue(s));
-        HeartParser zeroThroughFive = new HeartParser(0, 5, s -> new ZeroThroughFiveValue(s));
+        HeartParser zeroThroughThreeParser = new HeartParser(0, 3, s -> new ZeroThroughThreeValue(s));
+        HeartParser twoThroughFourParser = new HeartParser(2, 4, s -> new TwoThroughFourValue(s));
+        HeartParser zeroThroughFivParser = new HeartParser(0, 5, s -> new ZeroThroughFiveValue(s));
 
         List<Parser<?>> parsers = new ArrayList<>(Parsers.DEFAULT);
         parsers.add(zeroThroughThree);
@@ -46,5 +47,65 @@ public class MultipleCustomParsersTest {
         parsers.add(zeroThroughFive);
 
         return CsvTestUtil.defaultCsvBuilder().parsers(parsers).build();
+    }
+
+    private static final class ZeroThroughThreeValue {
+        private final String text;
+
+        public ZeroThroughThreeValue(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            ZeroThroughThreeValue that = (ZeroThroughThreeValue) o;
+            return Objects.equals(text, that.text);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(text);
+        }
+    }
+
+    private static final class TwoThroughFourValue {
+        private final String text;
+
+        public TwoThroughFourValue(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            TwoThroughFourValue that = (TwoThroughFourValue) o;
+            return Objects.equals(text, that.text);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(text);
+        }
+    }
+
+    private static final class ZeroThroughFiveValue {
+        private final String text;
+
+        public ZeroThroughFiveValue(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            ZeroThroughFiveValue that = (ZeroThroughFiveValue) o;
+            return Objects.equals(text, that.text);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(text);
+        }
     }
 }
