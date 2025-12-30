@@ -206,6 +206,7 @@ public final class ParseDenseStorageToColumn {
                 result = tryTwoPhaseParse(parsers.get(ii), gctx, ih.get(), ihAlt.get());
             } else {
                 final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
+                tempFullIterator.tryMoveNext(); // Input is not empty, so we know this will succeed.
                 result = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator, ihAlt.get());
             }
             if (result != null) {
