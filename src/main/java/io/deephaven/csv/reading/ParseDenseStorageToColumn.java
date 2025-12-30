@@ -205,7 +205,7 @@ public final class ParseDenseStorageToColumn {
         for (int ii = 0; ii < parsers.size() - 1; ++ii) {
             final Pair<Result, Moveable<IteratorHolder>> rof;
             if (ii < customBegin || ii >= customEnd) {
-                rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt);
+                rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt.get());
                 if (rof.first != null) {
                     return rof.first;
                 }
@@ -215,7 +215,7 @@ public final class ParseDenseStorageToColumn {
                 ih = rof.second.move();
             } else {
                 Moveable<IteratorHolder> tempFullIterator = new Moveable<>(new IteratorHolder(ihAlt.get().dsr().copy()));
-                rof = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator.move(), ihAlt);
+                rof = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator.move(), ihAlt.get());
                 if (rof.first != null) {
                     return rof.first;
                 }
