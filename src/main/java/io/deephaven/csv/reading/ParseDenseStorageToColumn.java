@@ -184,7 +184,7 @@ public final class ParseDenseStorageToColumn {
     }
 
     @NotNull
-    private static Result parseFromListNew(
+    private static Result parseFromList(
             final List<Parser<?>> parsersBeforeCustom,
             final List<Parser<?>> customParsers,
             final List<Parser<?>> parsersAfterCustom,
@@ -203,22 +203,15 @@ public final class ParseDenseStorageToColumn {
         }
 
         for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-            final Pair<Result, Moveable<IteratorHolder>> rof;
+            final Result result;
             if (ii < customBegin || ii >= customEnd) {
-                rof = tryTwoPhaseParse(parsers.get(ii), gctx, ih.move(), ihAlt.get());
-                if (rof.first != null) {
-                    return rof.first;
-                }
-                // If the operation failed, we need to move the IteratorHolders back to our local variables and try
-                // again. This might feel like overkill, but we are trying to be very disciplined about having at
-                // most one variable holding a reference to our DenseStorageReader.
-                ih = rof.second.move();
+                result = tryTwoPhaseParse(parsers.get(ii), gctx, ih.get(), ihAlt.get());
             } else {
-                Moveable<IteratorHolder> tempFullIterator = new Moveable<>(new IteratorHolder(ihAlt.get().dsr().copy()));
-                rof = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator.move(), ihAlt.get());
-                if (rof.first != null) {
-                    return rof.first;
-                }
+                final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
+                result = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator, ihAlt.get());
+            }
+            if (result != null) {
+                return result;
             }
         }
 
@@ -228,30 +221,30 @@ public final class ParseDenseStorageToColumn {
         return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
     }
 
-    private static <TARRAY> Pair<Result, Moveable<IteratorHolder>> tryTwoPhaseParse(
+    private static <TARRAY> Result tryTwoPhaseParse(
             final Parser<TARRAY> parser,
             final Parser.GlobalContext gctx,
-            final Moveable<IteratorHolder> ih,
+            final IteratorHolder ih,
             final IteratorHolder ihAlt) throws CsvReaderException {
-        final long phaseOneStart = ih.get().numConsumed() - 1;
+        final long phaseOneStart = ih.numConsumed() - 1;
         final Parser.ParserContext<TARRAY> pctx = parser.makeParserContext(gctx, Parser.CHUNK_SIZE);
-        final long end = parser.tryParse(gctx, pctx, ih.get(), phaseOneStart, Long.MAX_VALUE, true);
-        if (!ih.get().isExhausted()) {
+        final long end = parser.tryParse(gctx, pctx, ih, phaseOneStart, Long.MAX_VALUE, true);
+        if (!ih.isExhausted()) {
             // This parser couldn't make it to the end but there are others remaining to try. Signal a
-            // failure to the caller so that it can try the next one. Also, since we are being disciplined
-            // about moving the IteratorHolders around, move them back to the caller so the caller can use
-            // them again.
-            return new Pair<>(null, ih.move());
+            // failure to the caller so that it can try the next one. Note that 'ih' has been advanced
+            // to the failing entry and 'ihAlt' has not been modified.
+            return null;
         }
         if (phaseOneStart == 0) {
             // Reached end, and started at zero so everything was parsed and we are done.
-            final Result result = new Result(pctx.sink(), pctx.dataType());
-            return new Pair<>(result, null);
+            return new Result(pctx.sink(), pctx.dataType());
         }
+
+        // Reached end but started somewhere other than zero. We will do the second phase parse
+        // now. By the assumption of the algorithm, the second phase parse will not fail with a
+        // parse fail. (If it does, we will throw an exception).
         final ParserResultWrapper<TARRAY> wrapper = new ParserResultWrapper<>(parser, pctx, phaseOneStart, end);
-        ih.reset();
-        final Result result = performSecondParsePhase(gctx, wrapper, ihAlt);
-        return new Pair<>(result, null);
+        return performSecondParsePhase(gctx, wrapper, ihAlt);
     }
 
     private static <TARRAY> Result performSecondParsePhase(final Parser.GlobalContext gctx,
