@@ -3,14 +3,12 @@ package io.deephaven.csv;
 import io.deephaven.csv.containers.ByteSlice;
 import io.deephaven.csv.parsers.*;
 import io.deephaven.csv.sinks.Sink;
-import io.deephaven.csv.testutil.Column;
-import io.deephaven.csv.testutil.ColumnSet;
-import io.deephaven.csv.testutil.CsvTestUtil;
-import io.deephaven.csv.testutil.MyReferenceTypeSink;
+import io.deephaven.csv.testutil.*;
 import io.deephaven.csv.util.CsvReaderException;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,7 +20,7 @@ public class MultipleCustomParsersTest {
                 "A,hello\n" +
                 "B,❤hello\n" +
                 "C,❤hello❤\n" +
-                "C,❤he❤llo❤\n";
+                "D,❤he❤llo❤\n";
 
         final ColumnSet expected =
                 ColumnSet.of(
@@ -34,7 +32,13 @@ public class MultipleCustomParsersTest {
                                 new TaggedHeartValue(HeartCategory.ZERO_THROUGH_THREE, "❤he❤llo❤")
                         ));
 
-        CsvTestUtil.invokeTest(csvSpecsWithHearts(), input, expected);
+        final MakeCustomColumn makeCustomColumn = (name, obj, size) -> {
+            final TaggedHeartValue[] arr = ((List<TaggedHeartValue>) obj).toArray(new TaggedHeartValue[0]);
+            return Column.ofArray(name, arr, size);
+        };
+
+        CsvTestUtil.invokeTest(csvSpecsWithHearts(), input, expected, CsvTestUtil.makeMySinkFactory(),
+                makeCustomColumn);
     }
 
     private static CsvSpecs csvSpecsWithHearts() {
@@ -43,11 +47,13 @@ public class MultipleCustomParsersTest {
         // HeartParser zeroThroughFiveParser = new HeartParser(0, 5, HeartCategory.ZERO_THROUGH_FIVE);
 
         List<Parser<?>> parsers = new ArrayList<>(Parsers.DEFAULT);
+        parsers.clear();
         parsers.add(zeroThroughThreeParser);
         // parsers.add(twoThroughFourParser);
         // parsers.add(zeroThroughFiveParser);
 
-        return CsvTestUtil.defaultCsvBuilder().parsers(parsers).build();
+
+        return CsvTestUtil.defaultCsvBuilder().parsers(parsers).putParserForIndex(0, Parsers.STRING).build();
     }
 
     private static final class HeartParser implements Parser<TaggedHeartValue[]> {
@@ -160,6 +166,11 @@ public class MultipleCustomParsersTest {
         @Override
         public int hashCode() {
             return Objects.hash(heartCategory, text);
+        }
+
+        @Override
+        public String toString() {
+            return heartCategory + ": " + text;
         }
     }
 }
