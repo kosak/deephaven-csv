@@ -108,19 +108,24 @@ public final class ParseDenseStorageToColumn {
             return parseNumerics(cats, gctx, ih.move(), ihAlt.move());
         }
 
-        List<Parser<?>> parsersBeforeCustom = Collections.emptyList();
+        List<Parser<?>> inferencingParsers = Collections.emptyList();
         final MutableBoolean dummyBoolean = new MutableBoolean();
         final MutableLong dummyLong = new MutableLong();
         if (cats.timestampParser != null && tokenizer.tryParseLong(ih.get().bs(), dummyLong)) {
-            parsersBeforeCustom = Collections.singletonList(cats.timestampParser);
+            inferencingParsers = Collections.singletonList(cats.timestampParser);
         } else if (cats.booleanParser != null && tokenizer.tryParseBoolean(ih.get().bs(), dummyBoolean)) {
-            parsersBeforeCustom = Collections.singletonList(cats.booleanParser);
+            inferencingParsers = Collections.singletonList(cats.booleanParser);
         } else if (cats.dateTimeParser != null && tokenizer.tryParseDateTime(ih.get().bs(), dummyLong)) {
-            parsersBeforeCustom = Collections.singletonList(cats.dateTimeParser);
+            inferencingParsers = Collections.singletonList(cats.dateTimeParser);
         }
-        return parseFromCuratedSelections(parsersBeforeCustom,
-                cats.customParsers,
-                cats.charAndStringParsers,
+
+        List<Parser<?>> nonInferencingParsers = new ArrayList<>();
+        nonInferencingParsers.addAll(cats.customParsers);
+        nonInferencingParsers.addAll(cats.charAndStringParsers);
+
+        return CuratedSelectionsParser.parseFromCuratedSelections999(
+                inferencingParsers,
+                nonInferencingParsers,
                 gctx, ih.move(), ihAlt.move());
     }
 
