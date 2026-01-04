@@ -96,18 +96,40 @@ public class MultipleCustomParsersTest {
                 makeCustomColumn);
     }
 
+    @Test
+    public void sixHearts() throws CsvReaderException {
+        final String input = "Key,Value\n" +
+                "A,❤hello❤\n" +
+                "B,❤❤hello❤❤\n" +
+                "C,❤❤❤hello❤❤❤\n" +
+                "D,❤he❤llo❤\n";
+
+        final ColumnSet expected =
+                ColumnSet.of(
+                        Column.ofRefs("Key", "A", "B", "C", "D"),
+                        Column.ofRefs("Value", "❤hello❤", "❤❤hello❤❤", "❤❤❤hello❤❤❤", "❤he❤llo❤"));
+
+        final MakeCustomColumn makeCustomColumn = (name, obj, size) -> {
+            final TaggedHeartValue[] arr = ((List<TaggedHeartValue>) obj).toArray(new TaggedHeartValue[0]);
+            return Column.ofArray(name, arr, size);
+        };
+
+        CsvTestUtil.invokeTest(csvSpecsWithHearts(), input, expected, CsvTestUtil.makeMySinkFactory(),
+                makeCustomColumn);
+    }
+
+
     private static CsvSpecs csvSpecsWithHearts() {
         HeartParser zeroThroughThreeParser = new HeartParser(0, 3, HeartCategory.ZERO_THROUGH_THREE);
         HeartParser twoThroughFourParser = new HeartParser(2, 4, HeartCategory.TWO_THROUGH_FOUR);
         HeartParser zeroThroughFiveParser = new HeartParser(0, 5, HeartCategory.ZERO_THROUGH_FIVE);
 
         List<Parser<?>> parsers = new ArrayList<>(Parsers.DEFAULT);
-        parsers.clear();
         parsers.add(zeroThroughThreeParser);
         parsers.add(twoThroughFourParser);
         parsers.add(zeroThroughFiveParser);
 
-        return CsvTestUtil.defaultCsvBuilder().parsers(parsers).putParserForIndex(0, Parsers.STRING).build();
+        return CsvTestUtil.defaultCsvBuilder().parsers(parsers).build();
     }
 
     private static final class HeartParser implements Parser<TaggedHeartValue[]> {
