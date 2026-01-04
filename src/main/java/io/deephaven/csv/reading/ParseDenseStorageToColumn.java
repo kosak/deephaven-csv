@@ -77,7 +77,7 @@ public final class ParseDenseStorageToColumn {
             final Parser<?> parserToUse = parserSet.iterator().next();
             ih.reset();
             ihAlt.get().mustMoveNext();
-            OnePhaseParser.onePhaseParse(parserToUse, gctx, ihAlt.get());
+            return OnePhaseParser.onePhaseParse(parserToUse, gctx, ihAlt.get());
         }
 
         boolean columnIsAllNulls = true;
