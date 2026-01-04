@@ -202,17 +202,35 @@ public final class ParseDenseStorageToColumn {
         }
 
         for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-            final Result result;
+            final ParserResultWrapper<?> resultWrapper;
             if (ii < customBegin || ii >= customEnd) {
-                result = tryTwoPhaseParse(parsers.get(ii), gctx, ih.get(), ihAlt.get());
+                resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, ih.get());
             } else {
                 final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
                 tempFullIterator.tryMoveNext(); // Input is not empty, so we know this will succeed.
-                result = tryTwoPhaseParse(parsers.get(ii), gctx, tempFullIterator, ihAlt.get());
+                resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, tempFullIterator);
             }
-            if (result != null) {
-                return result;
+
+            if (resultWrapper == null) {
+                // This parser failed before input exhaustion. Try the next one.
+                continue;
             }
+
+            if (resultWrapper.begin == 0) {
+                // Parser completed at input exhaustion and it also started from 0. We are done.
+                return new Result(resultWrapper.pctx.sink(), resultWrapper.pctx.dataType());
+            }
+
+            // Parser completed at input exhaustion, but did not start from 0. We need to do the
+            // second phase parse (with the same parser) to get all the items in the interval [0..begin).
+            // By the assumptions of our algorithm (later parsers accept all inputs of prior parsers),
+            // this parse cannot fail.
+
+            // Let go of the first iterator (some friendliness for the garbage collector)
+            ih.reset();
+            // Point ihAlt to the first element. This succeeds because the input is not empty
+            ihAlt.get().mustMoveNext();
+            return TwoPhaseParser.finishSecondParsePhase(gctx, resultWrapper, ihAlt.get());
         }
 
         // The final parser in the set gets special (more efficient) handling because there's nothing to
@@ -221,43 +239,37 @@ public final class ParseDenseStorageToColumn {
         return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
     }
 
-    private static <TARRAY> Result tryTwoPhaseParse(
-            final Parser<TARRAY> parser,
-            final Parser.GlobalContext gctx,
-            final IteratorHolder ih,
-            final IteratorHolder ihAlt) throws CsvReaderException {
-        final long phaseOneStart = ih.numConsumed() - 1;
-        final Parser.ParserContext<TARRAY> pctx = parser.makeParserContext(gctx, Parser.CHUNK_SIZE);
-        final long end = parser.tryParse(gctx, pctx, ih, phaseOneStart, Long.MAX_VALUE, true);
-        if (!ih.isExhausted()) {
-            // This parser couldn't make it to the end but there are others remaining to try. Signal a
-            // failure to the caller so that it can try the next one. Note that 'ih' has been advanced
-            // to the failing entry and 'ihAlt' has not been modified.
-            return null;
-        }
-        if (phaseOneStart == 0) {
-            // Reached end, and started at zero so everything was parsed and we are done.
-            return new Result(pctx.sink(), pctx.dataType());
+    private static class TwoPhaseParser {
+        private static <TARRAY> ParserResultWrapper<TARRAY> tryAdvanceFirstPhase(
+                final Parser<TARRAY> parser,
+                final Parser.GlobalContext gctx,
+                final IteratorHolder ih) throws CsvReaderException {
+            final long phaseOneStart = ih.numConsumed() - 1;
+            final Parser.ParserContext<TARRAY> pctx = parser.makeParserContext(gctx, Parser.CHUNK_SIZE);
+            final long end = parser.tryParse(gctx, pctx, ih, phaseOneStart, Long.MAX_VALUE, true);
+            if (!ih.isExhausted()) {
+                // This parser couldn't make it to the end but there are others remaining to try. Signal a
+                // failure to the caller so that it can try the next one. Note that 'ih' has been advanced
+                // to the failing entry.
+                return null;
+            }
+
+            return new ParserResultWrapper<>(parser, pctx, phaseOneStart, end);
         }
 
-        // Reached end but started somewhere other than zero. We will do the second phase parse
-        // now. By the assumption of the algorithm, the second phase parse will not fail with a
-        // parse fail. (If it does, we will throw an exception).
-        final ParserResultWrapper<TARRAY> wrapper = new ParserResultWrapper<>(parser, pctx, phaseOneStart, end);
-        return performSecondParsePhase(gctx, wrapper, ihAlt);
-    }
+        private static <TARRAY> Result finishSecondParsePhase(
+                final Parser.GlobalContext gctx,
+                final ParserResultWrapper<TARRAY> wrapper,
+                final IteratorHolder ih) throws CsvReaderException {
+            final long end = wrapper.parser.tryParse(gctx, wrapper.pctx, ih, 0, wrapper.begin, false);
 
-    private static <TARRAY> Result performSecondParsePhase(final Parser.GlobalContext gctx,
-            final ParserResultWrapper<TARRAY> wrapper, final IteratorHolder ihAlt) throws CsvReaderException {
-        ihAlt.tryMoveNext(); // Input is not empty, so we know this will succeed.
-        final long end = wrapper.parser.tryParse(gctx, wrapper.pctx, ihAlt, 0, wrapper.begin, false);
-
-        if (end == wrapper.begin) {
-            return new Result(wrapper.pctx.sink(), wrapper.pctx.dataType());
+            if (end == wrapper.begin) {
+                return new Result(wrapper.pctx.sink(), wrapper.pctx.dataType());
+            }
+            final String message = "Logic error: second parser phase failed on input. Parser was: "
+                    + wrapper.parser.getClass().getCanonicalName();
+            throw new RuntimeException(message);
         }
-        final String message = "Logic error: second parser phase failed on input. Parser was: "
-                + wrapper.parser.getClass().getCanonicalName();
-        throw new RuntimeException(message);
     }
 
     @NotNull
