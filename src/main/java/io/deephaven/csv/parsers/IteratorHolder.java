@@ -48,6 +48,17 @@ public final class IteratorHolder {
     }
 
     /**
+     * Advance to the next (or very first) item.
+     * @throws CsvReaderException if the reader fails to advance or if the iteration is exhausted.
+     */
+    public void mustMoveNext() throws CsvReaderException {
+        if (tryMoveNext()) {
+            return;
+        }
+        throw new CsvReaderException("Iteration exhausted");
+    }
+
+    /**
      * Getter for the byte slice.
      * 
      * @return the byte slice

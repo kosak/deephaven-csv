@@ -182,222 +182,68 @@ public final class ParseDenseStorageToColumn {
         return new ParserResultWrapper<>(parser, pctx, begin, end);
     }
 
-    @NotNull
-    private static Result parseFromCuratedSelections(
-            final List<Parser<?>> parsersBeforeCustom,
-            final List<Parser<?>> customParsers,
-            final List<Parser<?>> parsersAfterCustom,
-            final Parser.GlobalContext gctx,
-            Moveable<IteratorHolder> ih,
-            Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
-        List<Parser<?>> parsers = new ArrayList<>();
-        parsers.addAll(parsersBeforeCustom);
-        final int customBegin = parsers.size();
-        parsers.addAll(customParsers);
-        final int customEnd = parsers.size();
-        parsers.addAll(parsersAfterCustom);
-
-        if (parsers.isEmpty()) {
-            throw new CsvReaderException("No available parsers.");
-        }
-
-        for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-            final ParserResultWrapper<?> resultWrapper;
-            if (ii < customBegin || ii >= customEnd) {
-                resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, ih.get());
-            } else {
-                final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
-                tempFullIterator.mustMoveNext(); // Input is not empty, so we know this will succeed.
-                resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, tempFullIterator);
-            }
-
-            if (resultWrapper == null) {
-                // This parser failed before input exhaustion. Try the next one.
-                continue;
-            }
-
-            if (resultWrapper.begin == 0) {
-                // Parser completed at input exhaustion and it also started from 0. We are done.
-                return new Result(resultWrapper.pctx.sink(), resultWrapper.pctx.dataType());
-            }
-
-            // Parser completed at input exhaustion, but did not start from 0. We need to do the
-            // second phase parse (with the same parser) to get all the items in the interval [0..begin).
-            // By the assumptions of our algorithm (later parsers accept all inputs of prior parsers),
-            // this parse cannot fail.
-
-            // Let go of the first iterator (some friendliness for the garbage collector)
-            ih.reset();
-            // Point ihAlt to the first element. This succeeds because the input is not empty
-            ihAlt.get().mustMoveNext();
-            return TwoPhaseParser.finishSecondParsePhase(gctx, resultWrapper, ihAlt.get());
-        }
-
-        // The final parser in the set gets special (more efficient) handling because there's nothing to
-        // fall back to.
-        ih.reset();
-        return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
-    }
-
     private static class CuratedSelectionsParser {
         @NotNull
         private static Result parseFromCuratedSelections999(
-                final List<Parser<?>> parsersBeforeCustom,
-                final List<Parser<?>> customParsers,
-                final List<Parser<?>> parsersAfterCustom,
+                final Collection<Parser<?>> inferencingParsers,
+                final Collection<Parser<?>> nonInferencingParsers,
                 final Parser.GlobalContext gctx,
                 Moveable<IteratorHolder> ih,
                 Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
-            List<Parser<?>> parsers = new ArrayList<>();
-            parsers.addAll(parsersBeforeCustom);
-            final int customBegin = parsers.size();
-            parsers.addAll(customParsers);
-            final int customEnd = parsers.size();
-            parsers.addAll(parsersAfterCustom);
+            List<Parser<?>> inferencingParsersList = new ArrayList<>(inferencingParsers);
+            List<Parser<?>> nonInferencingParsersList = new ArrayList<>(nonInferencingParsers);
 
-            if (parsers.isEmpty()) {
-                throw new CsvReaderException("No available parsers.");
-            }
-
-            if (!parsersAfterCustom.isEmpty()) {
-                zamboni = parsersAfterCustom.removeLast();
-            } else if (!customParsers.isEmpty()) {
-                zamboni = customParsers.removeLast();
-            } else if (!parsersBeforeCustom.isEmpty()) {
-                zamboni = parsersBeforeCustom.removeLast();
+            Parser<?> lastParser;
+            if (!nonInferencingParsersList.isEmpty()) {
+                lastParser = nonInferencingParsersList.removeLast();
+            } else if (!inferencingParsersList.isEmpty()) {
+                lastParser = inferencingParsersList.removeLast();
             } else {
                 throw new CsvReaderException("No available parsers.");
             }
 
+            for (Parser<?> parser : inferencingParsers) {
+                final ParserResultWrapper<?> resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(
+                        parser, gctx, ih.get());
 
-            for (Parser<?> parser : parsersBeforeCustom) {
-                final Result result = parseFromCuratedSelections999Helper(stuff);
-                if (result != null) {
-                    return result;
+                if (resultWrapper == null) {
+                    continue;
                 }
+
+                if (resultWrapper.begin == 0) {
+                    // Parser completed at input exhaustion and it also started from 0. We are done.
+                    return new Result(resultWrapper.pctx.sink(), resultWrapper.pctx.dataType());
+                }
+
+                // Parser completed at input exhaustion, but did not start from 0. We need to do the
+                // second phase parse (with the same parser) to get all the items in the interval [0..begin).
+                // By the assumptions of our algorithm (later parsers accept all inputs of prior parsers),
+                // this parse cannot fail.
+
+                // Point ihAlt to the first element. This succeeds because the input is not empty
+                ihAlt.get().mustMoveNext();
+                return TwoPhaseParser.finishSecondParsePhase(gctx, resultWrapper, ihAlt.get());
             }
+
+            // The remaining parsers all work on the input from the beginning. We can let go of the
+            // first iterator, because we won't use it again.
+            ih.reset();
 
             // Custom parsers are special
-            for (Parser<?> parser : parsersAfterCustom) {
-                final Result result = parseFromCuratedSelections999Helper(other_stuff);
+            for (Parser<?> parser : nonInferencingParsers) {
+                final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
+                tempFullIterator.mustMoveNext(); // Input is not empty, so we know this will succeed.
+                final Result result = OnePhaseParser.tryOnePhaseParse(parser, gctx, tempFullIterator);
                 if (result != null) {
                     return result;
                 }
             }
 
-            // Continue with final parsers
-            for (Parser<?> parser : parsersBeforeCustom) {
-                final Result result = parseFromCuratedSelections999Helper(stuff);
-                if (result != null) {
-                    return result;
-                }
-            }
-
-            // zamboni parser is special
-            // The final parser in the set gets special (more efficient) handling because there's nothing to
-            // fall back to.
-            ih.reset();
+            // The last parser is special
             ihAlt.get().mustMoveNext();
-            return OnePhaseParser.onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.get());
-
-
-
-            for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-                final ParserResultWrapper<?> resultWrapper;
-                if (ii < customBegin || ii >= customEnd) {
-                    resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, ih.get());
-                } else {
-                    final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
-                    tempFullIterator.mustMoveNext(); // Input is not empty, so we know this will succeed.
-                    resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, tempFullIterator);
-                }
-
-                if (resultWrapper == null) {
-                    // This parser failed before input exhaustion. Try the next one.
-                    continue;
-                }
-
-                if (resultWrapper.begin == 0) {
-                    // Parser completed at input exhaustion and it also started from 0. We are done.
-                    return new Result(resultWrapper.pctx.sink(), resultWrapper.pctx.dataType());
-                }
-
-                // Parser completed at input exhaustion, but did not start from 0. We need to do the
-                // second phase parse (with the same parser) to get all the items in the interval [0..begin).
-                // By the assumptions of our algorithm (later parsers accept all inputs of prior parsers),
-                // this parse cannot fail.
-
-                // Let go of the first iterator (some friendliness for the garbage collector)
-                ih.reset();
-                // Point ihAlt to the first element. This succeeds because the input is not empty
-                ihAlt.get().mustMoveNext();
-                return TwoPhaseParser.finishSecondParsePhase(gctx, resultWrapper, ihAlt.get());
-            }
-
-            // The final parser in the set gets special (more efficient) handling because there's nothing to
-            // fall back to.
-            ih.reset();
-            return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
-        }
-
-        @NotNull
-        private static Result parseFromCuratedSelections999Helper(
-                final List<Parser<?>> parsersBeforeCustom,
-                final List<Parser<?>> customParsers,
-                final List<Parser<?>> parsersAfterCustom,
-                final Parser.GlobalContext gctx,
-                Moveable<IteratorHolder> ih,
-                Moveable<IteratorHolder> ihAlt) throws CsvReaderException {
-            List<Parser<?>> parsers = new ArrayList<>();
-            parsers.addAll(parsersBeforeCustom);
-            final int customBegin = parsers.size();
-            parsers.addAll(customParsers);
-            final int customEnd = parsers.size();
-            parsers.addAll(parsersAfterCustom);
-
-            if (parsers.isEmpty()) {
-                throw new CsvReaderException("No available parsers.");
-            }
-
-            for (int ii = 0; ii < parsers.size() - 1; ++ii) {
-                final ParserResultWrapper<?> resultWrapper;
-                if (ii < customBegin || ii >= customEnd) {
-                    resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, ih.get());
-                } else {
-                    final IteratorHolder tempFullIterator = new IteratorHolder(ihAlt.get().dsr().copy());
-                    tempFullIterator.mustMoveNext(); // Input is not empty, so we know this will succeed.
-                    resultWrapper = TwoPhaseParser.tryAdvanceFirstPhase(parsers.get(ii), gctx, tempFullIterator);
-                }
-
-                if (resultWrapper == null) {
-                    // This parser failed before input exhaustion. Try the next one.
-                    continue;
-                }
-
-                if (resultWrapper.begin == 0) {
-                    // Parser completed at input exhaustion and it also started from 0. We are done.
-                    return new Result(resultWrapper.pctx.sink(), resultWrapper.pctx.dataType());
-                }
-
-                // Parser completed at input exhaustion, but did not start from 0. We need to do the
-                // second phase parse (with the same parser) to get all the items in the interval [0..begin).
-                // By the assumptions of our algorithm (later parsers accept all inputs of prior parsers),
-                // this parse cannot fail.
-
-                // Let go of the first iterator (some friendliness for the garbage collector)
-                ih.reset();
-                // Point ihAlt to the first element. This succeeds because the input is not empty
-                ihAlt.get().mustMoveNext();
-                return TwoPhaseParser.finishSecondParsePhase(gctx, resultWrapper, ihAlt.get());
-            }
-
-            // The final parser in the set gets special (more efficient) handling because there's nothing to
-            // fall back to.
-            ih.reset();
-            return onePhaseParse(parsers.get(parsers.size() - 1), gctx, ihAlt.move());
+            return OnePhaseParser.onePhaseParse(lastParser, gctx, ihAlt.get());
         }
     }
-
 
     private static class TwoPhaseParser {
         private static <TARRAY> ParserResultWrapper<TARRAY> tryAdvanceFirstPhase(
@@ -436,15 +282,24 @@ public final class ParseDenseStorageToColumn {
         @NotNull
         private static <TARRAY> Result onePhaseParse(final Parser<TARRAY> parser, final Parser.GlobalContext gctx,
                                                      final IteratorHolder ih) throws CsvReaderException {
-            final Parser.ParserContext<TARRAY> pctx = parser.makeParserContext(gctx, Parser.CHUNK_SIZE);
-            parser.tryParse(gctx, pctx, ih, 0, Long.MAX_VALUE, true);
-            if (ih.isExhausted()) {
-                return new Result(pctx.sink(), pctx.dataType());
+            final Result result = tryOnePhaseParse(parser, gctx, ih);
+            if (result != null) {
+                return result;
             }
             final String message = String.format(
                     "Parsing failed on input, with nothing left to fall back to. Parser %s successfully parsed %d items before failure.",
                     parser.getClass().getCanonicalName(), ih.numConsumed() - 1);
             throw new CsvReaderException(message);
+        }
+
+        private static <TARRAY> Result tryOnePhaseParse(final Parser<TARRAY> parser, final Parser.GlobalContext gctx,
+                                                     final IteratorHolder ih) throws CsvReaderException {
+            final Parser.ParserContext<TARRAY> pctx = parser.makeParserContext(gctx, Parser.CHUNK_SIZE);
+            parser.tryParse(gctx, pctx, ih, 0, Long.MAX_VALUE, true);
+            if (ih.isExhausted()) {
+                return new Result(pctx.sink(), pctx.dataType());
+            }
+            return null;
         }
     }
 
