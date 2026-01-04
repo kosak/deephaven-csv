@@ -129,7 +129,7 @@ public class MultipleCustomParsersTest {
         parsers.add(twoThroughFourParser);
         parsers.add(zeroThroughFiveParser);
 
-        return CsvTestUtil.defaultCsvBuilder().parsers(parsers).build();
+        return CsvTestUtil.defaultCsvBuilder().parsers(parsers).putParserForIndex(0, Parsers.STRING).build();
     }
 
     private static final class HeartParser implements Parser<TaggedHeartValue[]> {
