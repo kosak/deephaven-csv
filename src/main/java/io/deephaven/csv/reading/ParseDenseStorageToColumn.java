@@ -168,7 +168,7 @@ public final class ParseDenseStorageToColumn {
                 nonInferencingParsers.add(cats.stringParser);
             }
 
-            CuratedSelectionsParser.parseFromCuratedSelections999(inferencingParsers, nonInferencingParsers,
+            return CuratedSelectionsParser.parseFromCuratedSelections999(inferencingParsers, nonInferencingParsers,
                     gctx, ih.move(), ihAlt.move());
         }
 
@@ -182,7 +182,7 @@ public final class ParseDenseStorageToColumn {
         }
         // Otherwise (if some wrappers do not implement the Source interface), we have to do a reparse.
         final ParserResultWrapper<?> last = wrappers.get(wrappers.size() - 1);
-        return performSecondParsePhase(gctx, last, ihAlt.get());
+        return TwoPhaseParser.finishSecondParsePhase(gctx, last, ihAlt.get());
     }
 
     private static boolean canUnify(final List<ParserResultWrapper<?>> items) {
@@ -217,9 +217,9 @@ public final class ParseDenseStorageToColumn {
 
             Parser<?> lastParser;
             if (!nonInferencingParsersList.isEmpty()) {
-                lastParser = nonInferencingParsersList.removeLast();
+                lastParser = nonInferencingParsersList.remove(nonInferencingParsersList.size() - 1);
             } else if (!inferencingParsersList.isEmpty()) {
-                lastParser = inferencingParsersList.removeLast();
+                lastParser = inferencingParsersList.remove(inferencingParsersList.size() - 1);
             } else {
                 throw new CsvReaderException("No available parsers.");
             }
