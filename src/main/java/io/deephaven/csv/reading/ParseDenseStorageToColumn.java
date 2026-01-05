@@ -130,7 +130,7 @@ public final class ParseDenseStorageToColumn {
             nonInferencingParsers.add(cats.stringParser);
         }
 
-        return CuratedSelectionsParser.parseFromCuratedSelections999(
+        return CuratedSelectionsParser.parseFromCuratedSelections(
                 inferencingParsers,
                 nonInferencingParsers,
                 gctx, ih.move(), ihAlt.move());
@@ -168,7 +168,7 @@ public final class ParseDenseStorageToColumn {
                 nonInferencingParsers.add(cats.stringParser);
             }
 
-            return CuratedSelectionsParser.parseFromCuratedSelections999(inferencingParsers, nonInferencingParsers,
+            return CuratedSelectionsParser.parseFromCuratedSelections(inferencingParsers, nonInferencingParsers,
                     gctx, ih.move(), ihAlt.move());
         }
 
@@ -206,7 +206,7 @@ public final class ParseDenseStorageToColumn {
 
     private static class CuratedSelectionsParser {
         @NotNull
-        private static Result parseFromCuratedSelections999(
+        private static Result parseFromCuratedSelections(
                 final Collection<Parser<?>> inferencingParsers,
                 final Collection<Parser<?>> nonInferencingParsers,
                 final Parser.GlobalContext gctx,
