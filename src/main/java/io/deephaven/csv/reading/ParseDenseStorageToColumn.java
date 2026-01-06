@@ -203,7 +203,6 @@ public final class ParseDenseStorageToColumn {
                 nonInferencingParsers.add(cats.stringParser);
             }
 
-
             Parser<?> lastParser;
             if (!nonInferencingParsers.isEmpty()) {
                 lastParser = nonInferencingParsers.remove(nonInferencingParsers.size() - 1);
