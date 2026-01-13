@@ -3,6 +3,7 @@ package io.deephaven.csv.testutil;
 import io.deephaven.csv.CsvSpecs;
 import io.deephaven.csv.parsers.Parser;
 import io.deephaven.csv.parsers.Parsers;
+import io.deephaven.csv.reading.CsvReader;
 import io.deephaven.csv.util.CsvReaderException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.InputStream;
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.stream.Stream;
 
@@ -51,52 +55,36 @@ public class ParserFidelityTest {
                          ParseFidelity fastFloatFidelity,
                          ParseFidelity doubleFidelity) {
 
-        Column<float[]> expectedFloat = Column.ofValues("Values", Float.parseFloat(input));
-        Column<double[]> expectedDouble = Column.ofValues("Values", Double.parseDouble(input));
+        final Float expectedFloat = Float.parseFloat(input);
+        final Double expectedDouble = Double.parseDouble(input);
 
         checkHelper(input, expectedFloat, Parsers.FLOAT_STRICT, strictFloatFidelity);
         checkHelper(input, expectedFloat, Parsers.FLOAT_FAST, fastFloatFidelity);
         checkHelper(input, expectedDouble, Parsers.DOUBLE, doubleFidelity);
     }
 
-    private static void checkHelper(String input, Column<?> expectedColumn, Parser<?> parser,
+    private static void checkHelper(String input, Object expectedValue, Parser<?> parser,
                                     ParseFidelity fidelity) {
         final String source = "Values\n" + input + "\n";
-        final ColumnSet expected = ColumnSet.of(expectedColumn);
 
         final CsvSpecs specs = CsvTestUtil.defaultCsvBuilder().parsers(Collections.singletonList(parser)).build();
+        final InputStream stream = CsvTestUtil.toInputStream(source);
         try {
-            CsvTestUtil.invokeTest(specs, source, expected);
-            Assertions.assertThat(fidelity).isEqualTo(ParseFidelity.SAME);
+            CsvReader.Result result = CsvReader.read(specs, stream, CsvTestUtil.makeMySinkFactory());
+            Assertions.assertThat(result.numCols()).isEqualTo(1);
+            Assertions.assertThat(result.numRows()).isEqualTo(1);
+
+            final Object array = result.columns()[0].data();
+            final Object element0 = Array.get(array, 0);
+            boolean isSame = element0.equals(expectedValue);
+
+            if (isSame) {
+                Assertions.assertThat(fidelity).isEqualTo(ParseFidelity.SAME);
+            } else {
+                Assertions.assertThat(fidelity).isEqualTo(ParseFidelity.DIFFERENT);
+            }
         } catch (CsvReaderException e) {
             Assertions.assertThat(fidelity).isEqualTo(ParseFidelity.PARSE_FAIL);
         }
-    }
-
-    public void testFloatFast() throws CsvReaderException {
-        final String[] inputs = {
-                "NaN",
-                "-Infinity",
-                "+Infinity",
-                "0.1",
-                "3.4028235E38",  // Float.MaxValue
-                "1.4E-45",  // Float.MinValue
-                "1.4798235515974676E-17"
-        };
-
-        final float[] expectedValues = new float[inputs.length];
-        for (int i = 0; i != inputs.length; ++i) {
-            expectedValues[i] = Float.parseFloat(inputs[i]);
-        }
-
-        final String source = "Values\n" + String.join("\n", inputs);
-
-        final ColumnSet expected =
-                ColumnSet.of(
-                        Column.ofValues("Values", expectedValues));
-
-        final CsvSpecs specs = CsvTestUtil.defaultCsvBuilder().parsers(Collections.singletonList(
-                Parsers.FLOAT_FAST)).build();
-        CsvTestUtil.invokeTest(specs, source, expected);
     }
 }
