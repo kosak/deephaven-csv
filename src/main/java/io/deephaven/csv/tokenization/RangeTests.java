@@ -91,6 +91,7 @@ public class RangeTests {
      * @return True if the value is in range for a Java float. False otherwise.
      */
     public static boolean isInRangeForFloat(double value) {
+        System.out.println(value + "<= " + Float.MAX_VALUE + " : " + (value <= Float.MAX_VALUE)  + "  ... " + (value - Float.MAX_VALUE));
         return Double.isNaN(value)
                 || Double.isInfinite(value)
                 || (value >= -Float.MAX_VALUE && value <= Float.MAX_VALUE);
